@@ -159,22 +159,6 @@ def time_func_verb(func, *args):
     meantimediff, stdvtimediff = time_func(func, *args)
 
 
-# astrophysics
-def retr_fluxspecbbod(tmpt, wlen):
-    '''
-    Calculate the spectral flux (power per area per wavelenght) of a blackbody
-    wlen in microns
-    '''
-    
-    #0.0143877735e6 # [um K]
-    #spec = 3.742e11 / wlen**5 / (np.exp(0.0143877735e6 / (wlen * tmpt)) - 1.)
-    
-    print('temp: need to check the fudge factor here to go from temperature to W/m^2')
-    spec = 1e10 * 3.3e-7 * 3.742e11 / wlen**5 / (np.exp(0.0143877735e6 / (wlen * tmpt)) - 1.) # [W/m^2/s/nm]
-    
-    return spec
-
-
 def retr_offstime(time):
     
     timeoffs = int(np.amin(time) / 1000.) * 1000.
@@ -1188,6 +1172,9 @@ def retr_factconv():
     
     dictfact['pcau'] = 206265.
     
+    # 1 pc / 1 cm
+    dictfact['pccm'] = 3.086e18
+    
     # Astronomical Unit in Solar radius
     dictfact['aurs'] = 215.
     
@@ -1398,6 +1385,52 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
         elif listnamepara[k] == 'fluxbolosyst' or listnamepara[k] == 'fluxbolostar':
             listlablpara[k] = [r'$F_{bol}$', '']
             listscalpara[k] = 'logt'
+        
+        elif listnamepara[k].startswith('lumibbodbolo') or \
+             listnamepara[k].startswith('fracxrayboloaddi') or \
+             listnamepara[k].startswith('sbrtbbod0224') or \
+             listnamepara[k].startswith('lumibbod0224') or \
+             listnamepara[k].startswith('lumipred0224') or \
+             listnamepara[k].startswith('fluxpred0224'):
+            
+            if listnamepara[k].endswith('host'):
+                strgextn = 'host'
+                listnameparaextn = listnamepara[k][:-4]
+            else:
+                strgextn = ''
+                listnameparaextn = listnamepara[k]
+            
+            if listnameparaextn == 'lumibbodbolo':
+                #listlablpara[k] = [r'%s luminosity for black body, $L_{bol,BB}$' % strgextn, 'erg/s']
+                listlablpara[k] = [r'%s luminosity for black body' % strgextn, 'erg/s']
+        
+            elif listnameparaextn == 'fracxrayboloaddi':
+                #listlablpara[k] = [r'Ratio of additive %s X-ray luminosity \\ to bolometric luminosity, $f_{X}$' % strgextn, '']
+                listlablpara[k] = [r'Ratio of additive %s X-ray luminosity \\ to bolometric luminosity' % strgextn, '']
+        
+            elif listnameparaextn == 'sbrtbbod0224':
+                #listlablpara[k] = [r'0.2-2.4 KeV %s surface brightness \\ for black body, $I_{0.2-2.4KeV,BB,surf}$' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
+                listlablpara[k] = [r'0.2-2.4 KeV %s surface brightness \\ for black body' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
+            
+            elif listnameparaextn == 'lumibbod0224':
+                #listlablpara[k] = [r'0.2-2.4 KeV %s luminosity for black body, $L_{0.2-2.4KeV,BB}$' % strgextn, 'erg/s']
+                listlablpara[k] = [r'0.2-2.4 KeV %s luminosity for black body' % strgextn, 'erg/s']
+        
+            elif listnameparaextn == 'lumipred0224':
+                #listlablpara[k] = [r'Predicted 0.2-2.4 KeV %s luminosity \\ for black body, $L_{0.2-2.4KeV,BB}$' % strgextn, 'erg/s']
+                listlablpara[k] = [r'Predicted 0.2-2.4 KeV %s luminosity \\ for black body' % strgextn, 'erg/s']
+        
+            elif listnameparaextn == 'fluxpred0224':
+                #listlablpara[k] = [r'Predicted X-ray %s flux, $F_{0.2-2.4KeV}$' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
+                listlablpara[k] = [r'Predicted X-ray %s flux' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
+            
+            else:
+                print('listnameparaextn')
+                print(listnameparaextn)
+                raise Exception('')
+            
+            listscalpara[k] = 'logt'
+        
         # discovery magnitude
         elif listnamepara[k] == 'magtdisc':
             listlablpara[k] = [r'$m_{disc}$', '']
@@ -5557,6 +5590,15 @@ def retr_degrfromhang(strg, typefrst='hourangle'):
     return degr
 
 
+def retr_dict(listname):
+
+    thisdict = dict()
+    for name in listname:
+        thisdict[name] = [[], []]
+    
+    return thisdict
+
+
 def plot_grid(
               # a list with length equal to the number of parameters, 
               # Each element of the list should itself be list of two strings, where
@@ -5775,6 +5817,16 @@ def plot_grid(
     numbpara = listpara[0].shape[1]
     indxpara = np.arange(numbpara)
     
+    if len(listlablpara) != numbpara:
+        print('')
+        print('')
+        print('')
+        print('listlablpara')
+        print(listlablpara)
+        print('numbpara')
+        print(numbpara)
+        raise Exception('len(listlablpara) != numbpara')
+    
     if listnamepara is None:
         listnamepara = []
         for k in indxpara:
@@ -5843,11 +5895,15 @@ def plot_grid(
         listscalpara = ['self'] * numbpara
     
     if len(listscalpara) != len(listlablpara):
+        print('')
+        print('')
+        print('')
         print('listscalpara')
         print(listscalpara)
         print('listlablpara')
         print(listlablpara)
-        raise Exception('')
+        raise Exception('len(listscalpara) != len(listlablpara)')
+    
     if len(listscalpara) != numbpara:
         print('listscalpara')
         print(listscalpara)
@@ -5873,6 +5929,16 @@ def plot_grid(
     elif typeplottdim == 'best':
         listtypeplottdim = np.empty(numbpopl, dtype=object)
         indxpoplmaxm = np.argmax(numbsamp)
+        
+        print('')
+        print('')
+        print('')
+        print('numbsamp[indxpoplmaxm]')
+        print(numbsamp[indxpoplmaxm])
+        print('')
+        print('')
+        print('')
+
         if numbsamp[indxpoplmaxm] >= 1e3:
             listtypeplottdim[indxpoplmaxm] = 'hist'
         else:
@@ -6023,7 +6089,8 @@ def plot_grid(
                             print(limt[k])
                             print('minmtemp')
                             print(minmtemp)
-                            raise Exception('not np.isfinite(limt[k]).all() or minmtemp < 1e-100 and minmtemp > 0.')
+                            #raise Exception('not np.isfinite(limt[k]).all() or minmtemp < 1e-100 and minmtemp > 0.')
+                            print('Warning! Not np.isfinite(limt[k]).all() or minmtemp < 1e-100 and minmtemp > 0.')
 
         # sanity checks
         if booldiag:
@@ -6252,6 +6319,7 @@ def plot_grid(
             factulimyaxihist = 1.
         else:
             factulimyaxihist = 1.2
+            print('Multiple populations exist, which will require a legend. Will set factulimyaxihist to %g...' % factulimyaxihist)
 
         # one dimensional histograms
         for k in indxpara:
@@ -6338,6 +6406,7 @@ def plot_grid(
                         print(boolparagood[k])
                         print('boolparagood[%d]' % l)
                         print(boolparagood[l])
+                        print('')
                         continue
                     if k <= l:
                         continue
