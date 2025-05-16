@@ -1388,7 +1388,7 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
         
         elif listnamepara[k].startswith('lumibbodbolo') or \
              listnamepara[k].startswith('fracxrayboloaddi') or \
-             listnamepara[k].startswith('sbrtbbod0224') or \
+             listnamepara[k].startswith('fluxbbod0224') or \
              listnamepara[k].startswith('lumibbod0224') or \
              listnamepara[k].startswith('lumipred0224') or \
              listnamepara[k].startswith('fluxpred0224'):
@@ -1404,13 +1404,17 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
                 #listlablpara[k] = [r'%s luminosity for black body, $L_{bol,BB}$' % strgextn, 'erg/s']
                 listlablpara[k] = [r'%s luminosity for black body' % strgextn, 'erg/s']
         
+            elif listnameparaextn == 'lumibbodbolotest':
+                #listlablpara[k] = [r'%s luminosity for black body, $L_{bol,BB}$' % strgextn, 'erg/s']
+                listlablpara[k] = [r'Test %s luminosity for black body' % strgextn, 'erg/s']
+        
             elif listnameparaextn == 'fracxrayboloaddi':
                 #listlablpara[k] = [r'Ratio of additive %s X-ray luminosity \\ to bolometric luminosity, $f_{X}$' % strgextn, '']
                 listlablpara[k] = [r'Ratio of additive %s X-ray luminosity \\ to bolometric luminosity' % strgextn, '']
         
-            elif listnameparaextn == 'sbrtbbod0224':
+            elif listnameparaextn == 'fluxbbod0224':
                 #listlablpara[k] = [r'0.2-2.4 KeV %s surface brightness \\ for black body, $I_{0.2-2.4KeV,BB,surf}$' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
-                listlablpara[k] = [r'0.2-2.4 KeV %s surface brightness \\ for black body' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
+                listlablpara[k] = [r'0.2-2.4 KeV %s flux for black body' % strgextn, 'erg s$^{-1}$ cm$^{-2}$']
             
             elif listnameparaextn == 'lumibbod0224':
                 #listlablpara[k] = [r'0.2-2.4 KeV %s luminosity for black body, $L_{0.2-2.4KeV,BB}$' % strgextn, 'erg/s']
