@@ -591,10 +591,10 @@ def plot_recaprec( \
                   dictlistpara, \
                   
                   # list of Booleans for all samples indicating whether they are positive
-                  boolpositarg, \
+                  dictboolpositarg, \
 
                   # list of Booleans for all samples indicating whether they are relevant
-                  boolreletarg, \
+                  dictboolreletarg, \
 
                   # list of Booleans for all relevant samples indicating whether they are positive
                   #boolposirele, \
@@ -656,34 +656,40 @@ def plot_recaprec( \
     #if isinstance(boolposirele, list):
     #    boolposirele = np.array(boolposirele)
     
-    if isinstance(boolreletarg, list):
-        boolreletarg = np.array(boolreletarg)
+    if isinstance(dictboolreletarg, list):
+        dictboolreletarg = np.array(dictboolreletarg)
 
-    if isinstance(boolpositarg, list):
-        boolpositarg = np.array(boolpositarg)
+    if isinstance(dictboolpositarg, list):
+        dictboolpositarg = np.array(dictboolpositarg)
     
-    numbtarg = dictlistpara['anls'].shape[0]
-    indxtarg = np.arange(numbtarg)
-
-    indxtargrele = np.where(boolreletarg)[0]
-    indxtargposi = np.where(boolpositarg)[0]
-
-    numbtargrele = indxtargrele.size
-    numbtargposi = indxtargposi.size
+    listnameclassamp = ['anls', 'rele', 'irre', 'posi', 'nega']
     
-    boolposirele = np.zeros(numbtargrele, dtype=bool)
-    boolreleposi = np.zeros(numbtargposi, dtype=bool)
-    l = 0
-    m = 0
-    for k in indxtarg:
-        if k in indxtargrele:
-            if boolpositarg[k]:
-                boolposirele[l] = True
-            l += 1
-        if k in indxtargposi:
-            if boolreletarg[k]:
-                boolreleposi[m] = True
-            m += 1
+    dictnumbtarg = dict()
+    dictindxtarg = dict()
+    dictindxtargrele = dict()
+    dictindxtargposi = dict()
+    dictboolposirele = dict()
+    dictboolreleposi = dict()
+    for nameclassamp in listnameclassamp:
+        dictnumbtarg[nameclassamp] = dictlistpara[nameclassamp].shape[0]
+        dictindxtarg[nameclassamp] = np.arange(dictnumbtarg[nameclassamp])
+        dictindxtargrele[nameclassamp] = np.where(dictboolreletarg[nameclassamp])[0]
+        dictindxtargposi[nameclassamp] = np.where(dictboolpositarg[nameclassamp])[0]
+
+        dictboolposirele[nameclassamp] = np.zeros(dictindxtargrele[nameclassamp].size, dtype=bool)
+        dictboolreleposi[nameclassamp] = np.zeros(dictindxtargposi[nameclassamp].size, dtype=bool)
+        
+        l = 0
+        m = 0
+        for k in dictindxtarg[nameclassamp]:
+            if k in dictindxtargrele[nameclassamp]:
+                if dictboolpositarg[nameclassamp][k]:
+                    dictboolposirele[nameclassamp][l] = True
+                l += 1
+            if k in dictindxtargposi:
+                if dictboolreletarg[nameclassamp][k]:
+                    dictboolreleposi[nameclassamp][m] = True
+                m += 1
 
     # sanity checks
                                 #listpararele is not None and boolposirele.size != listpararele.shape[0] or \
@@ -750,8 +756,6 @@ def plot_recaprec( \
     if strgextn != '':
         strgextn = '_%s' % strgextn
     
-    listnameclassamp = ['anls', 'rele', 'irre', 'posi', 'nega']
-    
     dictnumbpara = dict()
     dictindxpara = dict()
     dictlistlablparatotl = dict()
@@ -759,10 +763,6 @@ def plot_recaprec( \
         dictnumbpara[nameclassamp] = dictlistpara[nameclassamp].shape[1]
         dictindxpara[nameclassamp] = np.arange(dictnumbpara[nameclassamp], dtype=int)
         dictlistlablparatotl[nameclassamp] = retr_listlabltotl(dictlistlablpara[nameclassamp])
-        print('nameclassamp')
-        print(nameclassamp)
-        print('dictlistnamepara[nameclassamp]')
-        print(dictlistnamepara[nameclassamp])
     
     listnametypeperf = ['reca', 'prec']
     numbtypeperf = len(listnametypeperf)
@@ -801,11 +801,14 @@ def plot_recaprec( \
                     print(nameclassamp)
                     print('namepara')
                     print(namepara)
+                    print('dictbinspara[nameclassamp][namepara]')
+                    summgene(dictbinspara[nameclassamp][namepara])
                     print('dictlistpara[nameclassamp][:, k]')
                     summgene(dictlistpara[nameclassamp][:, k])
                     print('dictlistscalpara[nameclassamp][k]')
                     print(dictlistscalpara[nameclassamp][k])
-                    raise Exception('')
+                    raise Exception('np.isfinite(dictbinspara[nameclassamp][namepara]).all()')
+
 
     varbperf = [[[] for g in range(2)] for c in indxtypeperf]
     stdvvarbperf = [[[] for g in range(2)] for c in indxtypeperf]
@@ -813,12 +816,6 @@ def plot_recaprec( \
     stdvvarbperftdim = [[[] for g in range(2)] for c in indxtypeperf]
     
     for c, nametypeperf in enumerate(listnametypeperf):
-        
-        if c == 0 and boolposirele.size == 0:
-            continue
-        
-        if c == 1 and boolreleposi.size == 0:
-            continue
         
         if c == 0:
             strgmetr = 'reca'
@@ -838,17 +835,14 @@ def plot_recaprec( \
         #    lablyaxi = 'Occurence rate'
         #    boolupprlimt = np.zeros(numbbins, dtype=bool)
                 
-        for g in range(2):
+        for g, nameclassamp in enumerate(listnameclassamp):
             
-            if g == 0:
-                nameclassamp = 'anls'
-                #listpara = dictlistpara['anls']
-            else:
-                if nametypeperf == 'reca':
-                    nameclassamp = 'rele'
-                if nametypeperf == 'prec':
-                    nameclassamp = 'posi'
-                    #listpara = dictlistpara['anls'][indxtargposi, :]
+            if c == 0 and dictboolposirele[nameclassamp].size == 0:
+                continue
+            
+            if c == 1 and dictboolreleposi[nameclassamp].size == 0:
+                continue
+        
             listpara = dictlistpara[nameclassamp]
             
             numbpara = len(dictlistnamepara[nameclassamp])
@@ -873,9 +867,17 @@ def plot_recaprec( \
                         numbinsd = indxinsd.size
                             
                         if c == 0:
-                            boolinsdtpos = np.logical_and(boolpositarg, boolinsd)
+                            if dictboolpositarg[nameclassamp].size != boolinsd.size:
+                                print('')
+                                print('')
+                                print('')
+                                print('nameclassamp')
+                                print(nameclassamp)
+                                raise Exception('boolpositarg.size != boolinsd.size')
+
+                            boolinsdtpos = np.logical_and(dictboolpositarg[nameclassamp], boolinsd)
                         if c == 1:
-                            boolinsdtpos = np.logical_and(boolreletarg, boolinsd)
+                            boolinsdtpos = np.logical_and(dictboolreletarg[nameclassamp], boolinsd)
                         indxinsdtpos = np.where(boolinsdtpos)[0]
                         numbinsdtpos = indxinsdtpos.size
                     
@@ -908,10 +910,6 @@ def plot_recaprec( \
                     summgene(listpara[:, k])
                     print('dictbinspara[nameclassamp][namepara]')
                     summgene(dictbinspara[nameclassamp][namepara])
-                    print('boolpositarg')
-                    summgene(boolpositarg)
-                    print('boolreletarg')
-                    summgene(boolreletarg)
                     print('nametypeperf')
                     print(nametypeperf)
                     print('namepara')
@@ -932,9 +930,9 @@ def plot_recaprec( \
                             indxinsdtdim = np.where(boolinsdtdim)[0]
                             numbinsdtdim = indxinsdtdim.size
                             if c == 0:
-                                boolinsdtdimtpos = np.logical_and(boolpositarg, boolinsdtdim)
+                                boolinsdtdimtpos = np.logical_and(dictboolpositarg[nameclassamp], boolinsdtdim)
                             if c == 1:
-                                boolinsdtdimtpos = np.logical_and(boolreletarg, boolinsdtdim)
+                                boolinsdtdimtpos = np.logical_and(dictboolreletarg[nameclassamp], boolinsdtdim)
                             indxinsdtdimtpos = np.where(boolinsdtdimtpos)[0]
                             numbinsdtdimtpos = indxinsdtdimtpos.size
                             
@@ -2385,9 +2383,12 @@ def retr_axis(minm=None, maxm=None, limt=None, numbpntsgrid=None, midpgrid=None,
         if listsamp is not None:
             if minm is not None or maxm is not None:
                 raise Exception('')
-
-            minm = np.amin(listsamp)
-            maxm = np.amax(listsamp)
+            
+            if not np.isfinite(listsamp).all():
+                print('retr_axis(): Not all samples of the list are finite. Disregarding non-finite samples when creating the grid...')
+            
+            minm = np.nanmin(listsamp)
+            maxm = np.nanmax(listsamp)
         
         if maxm is not None:
             limt = [minm, maxm]
