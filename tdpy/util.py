@@ -791,9 +791,10 @@ def plot_recaprec( \
             dictbinspara[nameclassamp][namepara], dictmidppara[nameclassamp][namepara], _, _, _ = retr_axis( \
                                                                 listsamp=dictlistpara[nameclassamp][:, k], \
                                                                 numbpntsgrid=numbbinspara[nameclassamp][namepara], scalpara=dictlistscalpara[nameclassamp][k])
-    
+            
             if booldiag:
-                if not np.isfinite(dictbinspara[nameclassamp][namepara]).all():
+                if not np.isfinite(dictbinspara[nameclassamp][namepara]).all() or \
+                    dictbinspara[nameclassamp][namepara].size != numbbinspara[nameclassamp][namepara] + 1:
                     print('')
                     print('')
                     print('')
@@ -801,13 +802,18 @@ def plot_recaprec( \
                     print(nameclassamp)
                     print('namepara')
                     print(namepara)
+                    print('numbbinspara[nameclassamp][namepara]')
+                    print(numbbinspara[nameclassamp][namepara])
                     print('dictbinspara[nameclassamp][namepara]')
                     summgene(dictbinspara[nameclassamp][namepara])
                     print('dictlistpara[nameclassamp][:, k]')
                     summgene(dictlistpara[nameclassamp][:, k])
                     print('dictlistscalpara[nameclassamp][k]')
                     print(dictlistscalpara[nameclassamp][k])
-                    raise Exception('np.isfinite(dictbinspara[nameclassamp][namepara]).all()')
+                    if not np.isfinite(dictbinspara[nameclassamp][namepara]).all():
+                        raise Exception('not np.isfinite(dictbinspara[nameclassamp][namepara]).all()')
+                    else:
+                        raise Exception('dictbinspara[nameclassamp][namepara].size != numbbinspara[nameclassamp][namepara] + 1'):
 
 
     varbperf = [[[] for g in range(2)] for c in indxtypeperf]
@@ -925,6 +931,17 @@ def plot_recaprec( \
                 
                     for a in range(numbbins):
                         for b in range(numbbinsseco):
+                            print('nameclassamp')
+                            print(nameclassamp)
+                            print('nameparaseco')
+                            print(nameparaseco)
+                            print('b')
+                            print(b)
+                            print('numbbinsseco')
+                            print(numbbinsseco)
+                            print('dictbinspara[nameclassamp][nameparaseco]')
+                            summgene(dictbinspara[nameclassamp][nameparaseco])
+                            print('')
                             boolinsdtdim = (dictbinspara[nameclassamp][namepara][a] < listpara[:, k]) & (listpara[:, k] < dictbinspara[nameclassamp][namepara][a+1]) & \
                                            (dictbinspara[nameclassamp][nameparaseco][b] < listpara[:, l]) & (listpara[:, l] < dictbinspara[nameclassamp][nameparaseco][b+1])
                             indxinsdtdim = np.where(boolinsdtdim)[0]
