@@ -673,6 +673,13 @@ def plot_recaprec( \
     numbclassamp = len(listnameclassamp)
     indxclassamp = np.arange(numbclassamp)
 
+    for nameclassamp in listnameclassamp:
+        if dictlistpara[nameclassamp].shape[0] != dictboolposisamp[nameclassamp].size:
+            print('')
+            print('')
+            print('')
+            raise Exception('dictlistpara[nameclassamp].shape[0] != dictboolposisamp[nameclassamp].size')
+            
     dictnumbsamp = dict()
     dictindxsamp = dict()
     dictindxsamprele = dict()
