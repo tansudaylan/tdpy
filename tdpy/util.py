@@ -29,6 +29,12 @@ import astropy.io
 
 import sklearn
 
+import astropy.units as u
+import tesswcs
+
+
+def wrap_ra_deg(ra_deg):
+    return ((360.0 - ra_deg + 180.0) % 360.0) - 180.0
 
 class gdatstrt(object):
 
@@ -164,6 +170,142 @@ def retr_offstime(time):
     timeoffs = int(np.amin(time) / 1000.) * 1000.
     
     return timeoffs
+
+
+
+
+
+def split_on_wrap(x, y, thresh=np.pi / 2):
+    xs = [x[0]]
+    ys = [y[0]]
+    segments = []
+    for i in range(1, len(x)):
+        if np.abs(x[i] - x[i - 1]) > thresh:
+            segments.append((np.array(xs), np.array(ys)))
+            xs = [x[i]]
+            ys = [y[i]]
+        else:
+            xs.append(x[i])
+            ys.append(y[i])
+    segments.append((np.array(xs), np.array(ys)))
+    return segments
+
+
+def field_is_on_ccd(wcs, coord, nx=NX, ny=NY):
+    xpix, ypix = wcs.world_to_pixel(coord)
+    return np.isfinite(xpix) and np.isfinite(ypix) and (0 <= xpix <= nx) and (0 <= ypix <= ny)
+
+
+def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=FIELDS, nx=NX, ny=NY):
+
+    FIELDS = [
+        ('ELAISS', 19.45, -44.02),
+        ('XMM-LSS', 35.57, -4.82),
+        ('ECDFS', 52.98, -28.12),
+        ('EDFS_a', 58.90, -49.32),
+        ('EDFS_b', 63.60, -47.60),
+        ('COSMOS', 150.11, 2.23),
+    ]
+
+
+    NX = 2048
+    NY = 2048
+
+    if isinstance(tess_sectors, int):
+        sectors = [tess_sectors]
+    else:
+        sectors = list(tess_sectors)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    if len(sectors) == 1:
+        filename = f'Sector{sectors[0]}_DDF.png'
+    else:
+        filename = f'lsst_ddf_tess_sectors_{sectors[0]}_{sectors[-1]}.png'
+
+    output_path = os.path.join(output_dir, filename)
+
+    field_sector_map = {}
+
+    for name, ra_deg, dec_deg in fields:
+        coord = SkyCoord(ra_deg * u.deg, dec_deg * u.deg, frame='icrs')
+        covered = []
+
+        for sector in sectors:
+            hit = False
+            for camera in [1, 2, 3, 4]:
+                for ccd in [1, 2, 3, 4]:
+                    wcs = tesswcs.WCS.from_sector(sector=sector, camera=camera, ccd=ccd)
+                    if field_is_on_ccd(wcs, coord, nx=nx, ny=ny):
+                        hit = True
+                        break
+                if hit:
+                    break
+            if hit:
+                covered.append(sector)
+
+        field_sector_map[name] = covered
+
+    for name, covered in field_sector_map.items():
+        print('%s: %s' % (name, covered))
+
+    fig = plt.figure(figsize=(14, 8))
+    ax = fig.add_subplot(111, projection='mollweide')
+    ax.grid(True, alpha=0.3)
+
+    for sector in sectors:
+        for camera in [1, 2, 3, 4]:
+            for ccd in [1, 2, 3, 4]:
+                wcs = tesswcs.WCS.from_sector(sector=sector, camera=camera, ccd=ccd)
+                xpix = np.array([0, 0, nx, nx, 0], dtype=float)
+                ypix = np.array([0, ny, ny, 0, 0], dtype=float)
+
+                sky = wcs.pixel_to_world(xpix, ypix)
+
+                ra = wrap_ra_deg(sky.ra.deg)
+                dec = sky.dec.deg
+
+                x = np.deg2rad(ra)
+                y = np.deg2rad(dec)
+
+                for xs, ys in split_on_wrap(x, y):
+                    if len(sectors) == 1:
+                        ax.plot(xs, ys, lw=0.6, alpha=0.4, color='tab:blue')
+                    else:
+                        ax.plot(xs, ys, lw=0.4, alpha=0.22, color='tab:blue')
+
+    for name, ra_deg, dec_deg in fields:
+        x = np.deg2rad(wrap_ra_deg(ra_deg))
+        y = np.deg2rad(dec_deg)
+
+        covered = field_sector_map[name]
+        label = '%s (%s)' % (name, ','.join([str(s) for s in covered]) if covered else 'none')
+
+        ax.scatter(x, y, s=60, marker='*', color='tab:red', zorder=5)
+        ax.text(x, y + np.deg2rad(2.0), label, ha='center', va='bottom', fontsize=9)
+
+    tick_degs = np.arange(-150, 181, 30)
+    tick_labels = [f'{int((360 - d) % 360)}°' for d in tick_degs]
+
+    ax.set_xticks(np.deg2rad(tick_degs))
+    ax.set_xticklabels(tick_labels)
+
+    ax.set_xlabel('Right Ascension')
+    ax.set_ylabel('Declination')
+
+    if len(sectors) == 1:
+        ax.set_title(f'LSST DDF Fields and TESS Sector {sectors[0]} Footprint')
+    else:
+        ax.set_title(f'LSST DDF Fields and TESS Sectors {sectors[0]}–{sectors[-1]} Footprint')
+
+    plt.tight_layout()
+
+    print('Writing to %s...' % output_path)
+
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()
+
+    return field_sector_map, output_path
 
 
 def calc_visitarg(rasctarg, decltarg, latiobvt, longobvt, strgtimeobvtyear, listdelttimeobvtyear, heigobvt=None):
