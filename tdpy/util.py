@@ -191,12 +191,16 @@ def split_on_wrap(x, y, thresh=np.pi / 2):
     return segments
 
 
-def field_is_on_ccd(wcs, coord, nx=NX, ny=NY):
+def field_is_on_ccd(wcs, coord, nx=None, ny=None):
+    
     xpix, ypix = wcs.world_to_pixel(coord)
-    return np.isfinite(xpix) and np.isfinite(ypix) and (0 <= xpix <= nx) and (0 <= ypix <= ny)
+    
+    booloccd = np.isfinite(xpix) and np.isfinite(ypix) and (0 <= xpix <= nx) and (0 <= ypix <= ny)
+
+    return boolccd
 
 
-def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=FIELDS, nx=NX, ny=NY):
+def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=None, nx=None, ny=None):
 
     FIELDS = [
         ('ELAISS', 19.45, -44.02),
