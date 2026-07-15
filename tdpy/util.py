@@ -2357,7 +2357,7 @@ def summgene(varb, boolslin=False, namepara=None, varbcomp=None, boolshowuniq=Fa
                 if varb.size == 0:
                     print('An empty number array with size 0.')
                     print('')
-                elif varb.dtype.type is np.string_ or varb.dtype.type is np.str_:
+                elif varb.dtype.type is np.bytes_ or varb.dtype.type is np.str_:
                     print('string type numpy array')
                 elif varb.dtype.type is np.object_:
                     print('Object type numpy array')
