@@ -105,6 +105,11 @@ def retr_dictstrg():
     dicttdpy['lcur'] = 'LightCurve'
     dicttdpy['cosc'] = 'CompactObjectWithStellarCompanion'
     dicttdpy['PlanetarySystem'] = 'SystemOfPlanets'
+    dicttdpy['PlanetarySystemEmittingCompanion'] = 'SystemOfPlanetsWithPhaseCurve'
+    dicttdpy['PlanetarySystemWithMoons'] = 'SystemOfPlanetsWithMoons'
+    dicttdpy['PlanetarySystemWithRingsFaceOn'] = 'SystemOfPlanetsWithRingsFaceOn'
+    dicttdpy['PlanetarySystemWithRingsInclinedVertical'] = 'SystemOfPlanetsWithRingsInclinedVertical'
+    dicttdpy['PlanetarySystemWithRingsInclinedHorizontal'] = 'SystemOfPlanetsWithRingsInclinedHorizontal'
     dicttdpy['psyspcur'] = 'SystemOfPlanetsWithPhaseCurve'
     dicttdpy['psysdiskedgehori'] = 'SystemOfPlanetsWithEdgeOnHorizontalDisks'
 
@@ -799,6 +804,79 @@ def plot_recaprec( \
                   
                  ):
     
+    # Support older positional call patterns from legacy scientific workflows.
+    # Legacy form:
+    #   plot_recaprec(pathvisu, strgextn, listvarbreca, listvarbprec,
+    #                 liststrgvarbreca, liststrgvarbprec,
+    #                 listlablvarbreca, listlablvarbprec,
+    #                 boolposirele, boolreleposi)
+    if dictlistpara is not None and not hasattr(dictlistpara, 'keys'):
+        legacy_strgextn = dictlistpara
+        listvarbreca = np.asarray(dictboolposisamp)
+        listvarbprec = np.asarray(dictboolrelesamp)
+
+        liststrgvarbreca = listnametypeperf if listnametypeperf is not None else []
+        liststrgvarbprec = dictlistnamepara if dictlistnamepara is not None else []
+        listlablvarbreca = dictlistlablpara if dictlistlablpara is not None else liststrgvarbreca
+        listlablvarbprec = dictlistscalpara if dictlistscalpara is not None else liststrgvarbprec
+        boolposirele = np.asarray(listnameparaposi, dtype=bool) if listnameparaposi is not None else np.ones(listvarbreca.shape[0], dtype=bool)
+        boolreleposi = np.asarray(listscalparaposi, dtype=bool) if listscalparaposi is not None else np.ones(listvarbprec.shape[0], dtype=bool)
+
+        if listvarbreca.ndim == 1:
+            listvarbreca = listvarbreca[:, None]
+        if listvarbprec.ndim == 1:
+            listvarbprec = listvarbprec[:, None]
+
+        n_reca = listvarbreca.shape[0]
+        n_prec = listvarbprec.shape[0]
+        ncols = max(listvarbreca.shape[1], listvarbprec.shape[1])
+        listvarbreca = np.pad(listvarbreca, ((0, 0), (0, ncols - listvarbreca.shape[1])), constant_values=np.nan)
+        listvarbprec = np.pad(listvarbprec, ((0, 0), (0, ncols - listvarbprec.shape[1])), constant_values=np.nan)
+
+        dictlistpara = {
+            'anls': np.concatenate([listvarbreca, listvarbprec], axis=0),
+            'rele': listvarbreca,
+            'irre': listvarbprec,
+            'posi': listvarbprec,
+            'nega': listvarbprec,
+        }
+        dictboolposisamp = {
+            'anls': np.concatenate([np.zeros(n_reca, dtype=bool), np.ones(n_prec, dtype=bool)]),
+            'rele': boolposirele[:n_reca] if boolposirele.size >= n_reca else np.pad(boolposirele, (0, n_reca - boolposirele.size), constant_values=False),
+            'irre': np.zeros(n_prec, dtype=bool),
+            'posi': np.ones(n_prec, dtype=bool),
+            'nega': np.zeros(n_prec, dtype=bool),
+        }
+        dictboolrelesamp = {
+            'anls': np.concatenate([np.ones(n_reca, dtype=bool), np.zeros(n_prec, dtype=bool)]),
+            'rele': np.ones(n_reca, dtype=bool),
+            'irre': np.zeros(n_prec, dtype=bool),
+            'posi': boolreleposi[:n_prec] if boolreleposi.size >= n_prec else np.pad(boolreleposi, (0, n_prec - boolreleposi.size), constant_values=False),
+            'nega': np.zeros(n_prec, dtype=bool),
+        }
+        dictlistnamepara = {
+            'anls': list(liststrgvarbreca) + list(liststrgvarbprec),
+            'rele': list(liststrgvarbreca),
+            'irre': list(liststrgvarbprec),
+            'posi': list(liststrgvarbprec),
+            'nega': list(liststrgvarbprec),
+        }
+        dictlistlablpara = {
+            'anls': list(listlablvarbreca) + list(listlablvarbprec),
+            'rele': list(listlablvarbreca),
+            'irre': list(listlablvarbprec),
+            'posi': list(listlablvarbprec),
+            'nega': list(listlablvarbprec),
+        }
+        dictlistscalpara = {
+            'anls': ['self'] * (len(liststrgvarbreca) + len(liststrgvarbprec)),
+            'rele': ['self'] * len(liststrgvarbreca),
+            'irre': ['self'] * len(liststrgvarbprec),
+            'posi': ['self'] * len(liststrgvarbprec),
+            'nega': ['self'] * len(liststrgvarbprec),
+        }
+        strgextn = legacy_strgextn
+
     #     Pos Neg
     # Rel TP  FN
     # Irr FP  TN
@@ -833,23 +911,27 @@ def plot_recaprec( \
     dictboolposirele = dict()
     dictboolreleposi = dict()
     for nameclassamp in listnameclassamp:
+        if nameclassamp not in dictlistpara:
+            continue
         dictnumbsamp[nameclassamp] = dictlistpara[nameclassamp].shape[0]
         dictindxsamp[nameclassamp] = np.arange(dictnumbsamp[nameclassamp])
-        dictindxsamprele[nameclassamp] = np.where(dictboolrelesamp[nameclassamp])[0]
-        dictindxsampposi[nameclassamp] = np.where(dictboolposisamp[nameclassamp])[0]
+        dictboolrelesamp_arr = np.asarray(dictboolrelesamp[nameclassamp]) if nameclassamp in dictboolrelesamp else np.array([], dtype=bool)
+        dictboolposisamp_arr = np.asarray(dictboolposisamp[nameclassamp]) if nameclassamp in dictboolposisamp else np.array([], dtype=bool)
+        dictindxsamprele[nameclassamp] = np.where(dictboolrelesamp_arr)[0]
+        dictindxsampposi[nameclassamp] = np.where(dictboolposisamp_arr)[0]
 
-        dictboolposirele[nameclassamp] = np.zeros(dictindxsamprele[nameclassamp].size, dtype=bool)
-        dictboolreleposi[nameclassamp] = np.zeros(dictindxsampposi[nameclassamp].size, dtype=bool)
-        
+        dictboolposirele[nameclassamp] = np.zeros(max(dictindxsamprele[nameclassamp].size, 0), dtype=bool)
+        dictboolreleposi[nameclassamp] = np.zeros(max(dictindxsampposi[nameclassamp].size, 0), dtype=bool)
+
         l = 0
         m = 0
         for k in dictindxsamp[nameclassamp]:
-            if k in dictindxsamprele[nameclassamp]:
-                if dictboolposisamp[nameclassamp][k]:
+            if k < dictboolrelesamp_arr.size and k in dictindxsamprele[nameclassamp]:
+                if dictboolposisamp_arr[k] if k < dictboolposisamp_arr.size else False:
                     dictboolposirele[nameclassamp][l] = True
                 l += 1
-            if k in dictindxsampposi:
-                if dictboolrelesamp[nameclassamp][k]:
+            if k < dictboolposisamp_arr.size and k in dictindxsampposi[nameclassamp]:
+                if dictboolrelesamp_arr[k] if k < dictboolrelesamp_arr.size else False:
                     dictboolreleposi[nameclassamp][m] = True
                 m += 1
 
@@ -950,14 +1032,56 @@ def plot_recaprec( \
     dictbinspara = dict()
     dictmidppara = dict()
     for x, nameclassamp in enumerate(listnameclassamp):
+        if nameclassamp not in dictlistpara:
+            continue
+
+        arrclass = np.asarray(dictlistpara[nameclassamp])
+        if arrclass.ndim == 1:
+            arrclass = arrclass[:, None]
+        dictlistpara[nameclassamp] = arrclass
+
+        ncolspara = arrclass.shape[1]
+        if nameclassamp in dictlistnamepara:
+            listnamepara = list(dictlistnamepara[nameclassamp])
+            if len(listnamepara) < ncolspara:
+                listnamepara += ['%s_%d' % (nameclassamp, k) for k in range(len(listnamepara), ncolspara)]
+            elif len(listnamepara) > ncolspara:
+                listnamepara = listnamepara[:ncolspara]
+            dictlistnamepara[nameclassamp] = listnamepara
+        else:
+            dictlistnamepara[nameclassamp] = ['%s_%d' % (nameclassamp, k) for k in range(ncolspara)]
+
+        if nameclassamp in dictlistlablpara:
+            listlablpara = list(dictlistlablpara[nameclassamp])
+            if len(listlablpara) < ncolspara:
+                listlablpara += [listnamepara[k] for k in range(len(listlablpara), ncolspara)]
+            elif len(listlablpara) > ncolspara:
+                listlablpara = listlablpara[:ncolspara]
+            dictlistlablpara[nameclassamp] = listlablpara
+        else:
+            dictlistlablpara[nameclassamp] = [dictlistnamepara[nameclassamp][k] for k in range(ncolspara)]
+
+        if nameclassamp in dictlistscalpara:
+            listscalpara = list(dictlistscalpara[nameclassamp])
+            if len(listscalpara) < ncolspara:
+                listscalpara += ['self'] * (ncolspara - len(listscalpara))
+            elif len(listscalpara) > ncolspara:
+                listscalpara = listscalpara[:ncolspara]
+            dictlistscalpara[nameclassamp] = listscalpara
+        else:
+            dictlistscalpara[nameclassamp] = ['self'] * ncolspara
+
         dictboolgood[nameclassamp] = np.ones(len(dictlistnamepara[nameclassamp]), dtype=bool)
         dictbinspara[nameclassamp] = dict()
         dictmidppara[nameclassamp] = dict()
         for k, namepara in enumerate(dictlistnamepara[nameclassamp]):
-            
+            if k >= dictlistpara[nameclassamp].shape[1]:
+                dictboolgood[nameclassamp][k] = False
+                continue
+
             if np.unique(dictlistpara[nameclassamp][:, k]).size == 1:
                 dictboolgood[nameclassamp][k] = False
-            
+
             if not dictboolgood[nameclassamp][k]:
                 print('Skipping parameter (%s) because all samples are the same...' % namepara)
                 continue
@@ -970,7 +1094,7 @@ def plot_recaprec( \
             dictbinspara[nameclassamp][namepara], dictmidppara[nameclassamp][namepara], _, _, _ = retr_axis( \
                                                                 listsamp=dictlistpara[nameclassamp][:, k], \
                                                                 numbpntsgrid=numbbinspara[nameclassamp][namepara], scalpara=dictlistscalpara[nameclassamp][k])
-            
+
             if booldiag:
                 if not np.isfinite(dictbinspara[nameclassamp][namepara]).all() or \
                     dictbinspara[nameclassamp][namepara].size != numbbinspara[nameclassamp][namepara] + 1:
@@ -2572,13 +2696,22 @@ def retr_axis(minm=None, maxm=None, limt=None, numbpntsgrid=None, midpgrid=None,
         if listsamp is not None:
             if minm is not None or maxm is not None:
                 raise Exception('')
-            
-            if not np.isfinite(listsamp).all():
-                print('retr_axis(): Not all samples of the list are finite. Disregarding non-finite samples when creating the grid...')
-            
-            minm = np.nanmin(listsamp)
-            maxm = np.nanmax(listsamp)
-        
+
+            arrsamp = np.asarray(listsamp)
+            if arrsamp.size == 0:
+                minm = 0.0
+                maxm = 1.0
+            else:
+                if not np.isfinite(arrsamp).all():
+                    print('retr_axis(): Not all samples of the list are finite. Disregarding non-finite samples when creating the grid...')
+                valid = arrsamp[np.isfinite(arrsamp)]
+                if valid.size == 0:
+                    minm = 0.0
+                    maxm = 1.0
+                else:
+                    minm = np.nanmin(valid)
+                    maxm = np.nanmax(valid)
+
         if maxm is not None:
             limt = [minm, maxm]
         if boolinte and int(limt[1] - limt[0]) < 1e7:
@@ -6282,6 +6415,7 @@ def plot_grid(
             limt[k] = np.empty(2)
             limt[k][0] = 1e100
             limt[k][1] = -1e100
+            have_valid = False
             for u in indxpopl:
                 boolsampfini = np.isfinite(listpara[u][:, k])
                 if listscalpara[k] == 'logt':
@@ -6300,11 +6434,18 @@ def plot_grid(
                         raise Exception('tdpy.plot_grid(): Parameter %d (%s) has a log scaling but also nonpositive elements!' % (k, listlablpara[k]))
                 else:
                     listindxgood[u][k] = np.where(boolsampfini)[0]
-            
+
                 if listindxgood[u][k].size > 0:
-                    limt[k][0] = min(limt[k][0], np.nanmin(listpara[u][listindxgood[u][k], k], 0))
-                    limt[k][1] = max(limt[k][1], np.nanmax(listpara[u][listindxgood[u][k], k], 0))
-            
+                    have_valid = True
+                    valid_vals = listpara[u][listindxgood[u][k], k]
+                    if valid_vals.size > 0:
+                        limt[k][0] = min(limt[k][0], np.nanmin(valid_vals, 0))
+                        limt[k][1] = max(limt[k][1], np.nanmax(valid_vals, 0))
+
+            if not have_valid:
+                limt[k][0] = 0.
+                limt[k][1] = 1.
+
             if booldiag:
                 if limt[k][0] == limt[k][1]:
                     print('')
