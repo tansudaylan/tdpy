@@ -36,6 +36,27 @@ import tesswcs
 def wrap_ra_deg(ra_deg):
     return ((360.0 - ra_deg + 180.0) % 360.0) - 180.0
 
+
+def _is_integer_like_array(arr, *, allow_nan=False):
+    """Return True if the finite entries of an array are all integer-like."""
+
+    values = np.asarray(arr)
+    if values.size == 0:
+        return True
+
+    finite = np.isfinite(values)
+    if not allow_nan and (~finite).any():
+        return False
+
+    if not finite.all():
+        values = values[finite]
+
+    if values.size == 0:
+        return True
+
+    return np.allclose(values, np.round(values), rtol=0.0, atol=1e-12)
+
+
 class gdatstrt(object):
 
     def __init__(self):
@@ -6384,8 +6405,9 @@ def plot_grid(
     for k in indxpara:
         boolinte[k] = True
         for u in indxpopl:
-            if ((listpara[u][:, k] - listpara[u][:, k].astype(int)) != 0).any() or boolforcflot:
+            if boolforcflot or not _is_integer_like_array(listpara[u][:, k], allow_nan=True):
                 boolinte[k] = False
+                break
     
     listsizepopl = []
     for u in indxpopl:

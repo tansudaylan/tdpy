@@ -1,3 +1,5 @@
+import warnings
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -36,3 +38,11 @@ def test_plot_catl_marks_catalog_and_mock_sources():
     assert '12, 0.2' in text_strings
 
     plt.close(figr)
+
+
+def test_integer_like_detection_handles_nan_values():
+    arr = np.array([1.0, 2.0, np.nan, 4.0])
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        assert tdpy.util._is_integer_like_array(arr) is False
