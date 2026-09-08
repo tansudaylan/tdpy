@@ -1003,9 +1003,9 @@ def plot_recaprec( \
     for c, nametypeperf in enumerate(listnametypeperf):
         
         if c == 0:
-            lablyaxi = strgreca + ' [\%]'
+            lablyaxi = strgreca + r' [\%]'
         if c == 1:
-            lablyaxi = 'Precision [\%]'
+            lablyaxi = r'Precision [\%]'
         if c == 2:
             lablyaxi = 'Occurence rate'
 
@@ -1412,7 +1412,7 @@ def retr_dictturk():
     dictturk['Kepler discoveries'] = 'Kepler keşifleri'
 
     dictturk['High TSM or ESM'] = 'Yüksek TSM veya ESM'
-    dictturk['High TSM or ESM \& Precise mass'] = 'Yüksek TSM veya ESM \& hassas kütle'
+    dictturk[r'High TSM or ESM \& Precise mass'] = r'Yüksek TSM veya ESM \& hassas kütle'
     
     dictturk['Old'] = 'Yaşlı'
     dictturk['Discovery Year'] = 'Keşif Yılı'
@@ -1446,8 +1446,8 @@ def retr_dictturk():
     dictturk['Bright, small, and visible from LCO'] = "Parlak, küçük ve LCO'dan gözlemlenebilir"
     dictturk['Bright, small, visible from LCO, and favorable for AC'] = "Parlak, küçük ve LCO'dan gözlemlenebilir ve atmosfer nitelendirmesine elverişli"
     dictturk['High TSM/ESM'] = 'Yüksek TSM/ESM'
-    dictturk['High TSM/ESM \& Precise mass'] = 'Yüksek TSM/ESM ve hassas kütle ölçümü'
-    dictturk['High TSM/ESM \& Weak mass'] = 'Yüksek TSM/ESM ve zayıf kütle ölçümü'
+    dictturk[r'High TSM/ESM \& Precise mass'] = r'Yüksek TSM/ESM ve hassas kütle ölçümü'
+    dictturk[r'High TSM/ESM \& Weak mass'] = r'Yüksek TSM/ESM ve zayıf kütle ölçümü'
     dictturk['Precise mass'] = 'Hassas Kütle Ölçümü'
     dictturk['Weak mass'] = 'Zayıf Kütle Ölçümü'
     dictturk['Time from midtransit'] = 'Geçiş ortasına göre zaman'
@@ -1557,7 +1557,7 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listscalpara[k] = 'self'
         
         elif listnamepara[k] == 'tolerrat':
-            listlablpara[k] = ['$\delta_{rr}$', '']
+            listlablpara[k] = [r'$\delta_{rr}$', '']
             listscalpara[k] = 'self'
         
         elif listnamepara[k] == 'namestar':
@@ -1669,17 +1669,17 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
         
         elif listnamepara[k] == 'velodisp':
             if boolmath:
-                labl = '$\sigma_{v}$'
+                labl = r'$\sigma_{v}$'
             else:
                 labl = 'Velocity dispersion'
             listlablpara[k] = [labl, 'km/s']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'massstel':
             if boolmath:
-                labl = '$M_{str}$'
+                labl = r'$M_{str}$'
             else:
                 labl = 'Stellar mass'
-            listlablpara[k] = [labl, '$10^{12}$ M$_{\odot}$']
+            listlablpara[k] = [labl, r'$10^{12}$ M$_{\odot}$']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'angleins':
             if boolmath:
@@ -1746,7 +1746,7 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'magnsour':
             if boolmath:
-                labl = '$\mu_{sour}$'
+                labl = r'$\mu_{sour}$'
             else:
                 labl = 'Magnification of the source'
             listlablpara[k] = [labl, '']
@@ -1781,64 +1781,64 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'radiplan':
             if boolmath:
-                listlablpara[k][0] = '$R_p$'
+                listlablpara[k][0] = r'$R_p$'
             else:
                 listlablpara[k][0] = 'Planetary radius'
-            listlablpara[k][1] = '$R_\oplus$'
+            listlablpara[k][1] = r'$R_\oplus$'
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'stdvradi%s' % strgelem:
-            listlablpara[k] = ['$\sigma_{R_p}$', '$R_\oplus$']
+            listlablpara[k] = [r'$\sigma_{R_p}$', r'$R_\oplus$']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'stdvtmpt%s' % strgelem:
-            listlablpara[k] = ['$\sigma_{T_p}$', 'K']
+            listlablpara[k] = [r'$\sigma_{T_p}$', 'K']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'radistar':
-            listlablpara[k] = ['$R_{\star}$', '$R_\odot$']
+            listlablpara[k] = [r'$R_{\star}$', r'$R_\odot$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'tagestar':
             listlablpara[k] = ['Age of the host star', 'Gyr']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'massplan':
-            listlablpara[k] = ['$M_p$', '$M_\oplus$']
+            listlablpara[k] = [r'$M_p$', r'$M_\oplus$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'stdvmass%s' % strgelem:
-            listlablpara[k] = ['$\sigma_{M_p}$', '$M_\oplus$']
+            listlablpara[k] = [r'$\sigma_{M_p}$', r'$M_\oplus$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'masssyst':
-            listlablpara[k] = ['$M_{sys}$', '$M_\odot$']
+            listlablpara[k] = [r'$M_{sys}$', r'$M_\odot$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'minmfrddtimeoutlsort':
-            listlablpara[k] = ['$\min_k f_k$', '']
+            listlablpara[k] = [r'$\min_k f_k$', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'massstar':
-            listlablpara[k] = ['$M_{\star}$', '$M_\odot$']
+            listlablpara[k] = [r'$M_{\star}$', r'$M_\odot$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'stdvmassstar':
-            listlablpara[k] = ['$\sigma_{M_\star}$', '$M_\odot$']
+            listlablpara[k] = [r'$\sigma_{M_\star}$', r'$M_\odot$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'massbhol':
-            listlablpara[k] = ['$M_{BH}$', '$M_\odot$']
+            listlablpara[k] = [r'$M_{BH}$', r'$M_\odot$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'densstar':
-            listlablpara[k] = ['$d_{\star}$', 'g cm$^{-3}$']
+            listlablpara[k] = [r'$d_{\star}$', r'g cm$^{-3}$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'tmpt%s' % strgelem:
-            listlablpara[k] = ['$T_p$', 'K']
+            listlablpara[k] = [r'$T_p$', 'K']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'lumistar':
-            listlablpara[k] = ['$L_{\star}$', '$L_{\odot}$']
+            listlablpara[k] = [r'$L_{\star}$', r'$L_{\odot}$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'tmptstar':
-            listlablpara[k] = ['$T_{\star}$', 'K']
+            listlablpara[k] = [r'$T_{\star}$', 'K']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'loggstar':
-            listlablpara[k] = ['$\log g$', '']
+            listlablpara[k] = [r'$\log g$', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'metastar':
             listlablpara[k] = ['[M/H]', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'ecce':
-            listlablpara[k] = ['$e$', '']
+            listlablpara[k] = [r'$e$', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'esmm':
             listlablpara[k] = ['Emission Spectroscopy Metric (ESM)', '']
@@ -1853,10 +1853,10 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listlablpara[k] = ['TSM$_{ACWG}$', '']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'logg%s' % strgelem:
-            listlablpara[k] = ['$\log g_p$', '']
+            listlablpara[k] = [r'$\log g_p$', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'dens%s' % strgelem:
-            listlablpara[k] = ['d', 'g cm$^{-3}$']
+            listlablpara[k] = ['d', r'g cm$^{-3}$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'epocmtratess':
             listlablpara[k] = ['$T_0$', 'BJD-2457000']
@@ -1899,9 +1899,9 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             elif listnamepara[k].startswith('scalstep'):
                 listlablpara[k] = ['$A_{b%s}$' % strg, '']
             elif listnamepara[k].startswith('rratcomp'):
-                listlablpara[k] = ['$R_{p%s}/R_{\star}$' % strg, '']
+                listlablpara[k] = [r'$R_{p%s}/R_{\star}$' % strg, '']
             elif listnamepara[k].startswith('rratcom'):
-                listlablpara[k] = ['$R_{%d%s}/R_{\star}$' % (int(listnamepara[k][7]), strg), '']
+                listlablpara[k] = [r'$R_{%d%s}/R_{\star}$' % (int(listnamepara[k][7]), strg), '']
             # linear limb-darkening coefficient
             elif listnamepara[k].startswith('coeflmdklinr'):
                 listlablpara[k] = ['$u_{l%s}$' % strg, '']
@@ -1931,7 +1931,7 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listscalpara[k] = 'self'
         # mean number of companions per star
         elif listnamepara[k] == 'numb%sstarmean' % strgelem:
-            listlablpara[k] = ['$\mu_{c}$', '']
+            listlablpara[k] = [r'$\mu_{c}$', '']
             listscalpara[k] = 'self'
         # number of transiting companions per star
         elif listnamepara[k] == 'numb%stranstar' % strgelem:
@@ -1977,7 +1977,7 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listlablpara[k] = ['Photometric Noise', 'ppt']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'nois':
-            listlablpara[k] = ['$\sigma$', 'ppt']
+            listlablpara[k] = [r'$\sigma$', 'ppt']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'proboccu':
             listlablpara[k] = ['$P_{occ}$', '']
@@ -1995,23 +1995,23 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listlablpara[k] = ['$N_{tr}$', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'cosi':
-            listlablpara[k] = ['$\cos i$', '']
+            listlablpara[k] = [r'$\cos i$', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'booltran':
             listlablpara[k] = ['Is transiting?', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'irra':
             if boolmath:
-                listlablpara[k][0] = '$I_{irr}$'
+                listlablpara[k][0] = r'$I_{irr}$'
             else:
                 listlablpara[k][0] = 'Irradiation'
-            listlablpara[k][1] = '$I_{\oplus}$'
+            listlablpara[k][1] = r'$I_{\oplus}$'
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'sdee' or listnamepara[k] == 'sdeepboxprim':
             listlablpara[k] = ['SDE', '']
             listscalpara[k] = 'self'
         elif listnamepara[k] == 'powrlspeprim':
-            listlablpara[k] = ['$\eta_{LS,max}$', '']
+            listlablpara[k] = [r'$\eta_{LS,max}$', '']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'peripboxprim':
             listlablpara[k] = ['$P_{BLS,max}$', 'days']
@@ -2021,28 +2021,28 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'mass%s' % strgelem:
             if strgelem == 'comp':
-                lablunit = '\odot'
+                lablunit = r'\odot'
             else:
-                lablunit = '\oplus'
-            listlablpara[k] = ['$M_{comp}$', '$M_%s$' % lablunit]
+                lablunit = r'\oplus'
+            listlablpara[k] = [r'$M_{comp}$', r'$M_%s$' % lablunit]
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'masstotl':
-            listlablpara[k] = ['$M_{tot}$', '$M_\odot$']
+            listlablpara[k] = [r'$M_{tot}$', r'$M_\odot$']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'smax' or listnamepara[k] == 'smax%s' % strgelem:
-            listlablpara[k] = ['$a$', 'AU']
+            listlablpara[k] = [r'$a$', 'AU']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'rsma':
-            listlablpara[k] = ['$(R_{\star}+R_p)/a$', '']
+            listlablpara[k] = [r'$(R_{\star}+R_p)/a$', '']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'rs2a':
-            listlablpara[k] = ['$R_\star/a$', '']
+            listlablpara[k] = [r'$R_\star/a$', '']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'dcyctrantotl':
-            listlablpara[k] = ['$\Delta \phi_{tr,tot}$', '']
+            listlablpara[k] = [r'$\Delta \phi_{tr,tot}$', '']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'amplslen':
-            listlablpara[k] = ['$A_{SL}$', 'ppt']
+            listlablpara[k] = [r'$A_{SL}$', 'ppt']
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'duratran%s' % strgelem or listnamepara[k] == 'duratran%stotl' % strgelem or listnamepara[k] == 'duratrantotl':
             listlablpara[k] = ['Total Transit Duration', 'hours']
@@ -2055,20 +2055,20 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'radi%s' % strgelem:
             if boolmath:
-                listlablpara[k][0] = '$R_c$'
+                listlablpara[k][0] = r'$R_c$'
             else:
                 listlablpara[k][0] = 'Companion radius'
-            listlablpara[k][1] = '$R_\oplus$'
+            listlablpara[k][1] = r'$R_\oplus$'
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'tmpt%s' % strgelem:
             if boolmath:
-                listlablpara[k][0] = '$T_c$'
+                listlablpara[k][0] = r'$T_c$'
             else:
                 listlablpara[k][0] = 'Companion temperature'
             listlablpara[k][1] = 'K'
             listscalpara[k] = 'logt'
         elif listnamepara[k] == 'mass%s' % strgelem:
-            listlablpara[k] = ['$M_{C}$', '$M_\odot$']
+            listlablpara[k] = [r'$M_{C}$', r'$M_\odot$']
             listscalpara[k] = 'self'
         
         # angular distance from the companion
@@ -2109,10 +2109,10 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
                 listlablpara[k] = ['Non-Keplerianity factor%s' % strgnume, '']
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'radicom':
-                listlablpara[k] = ['$R_{%s}$' % listnamepara[k][-1], '']
+                listlablpara[k] = [r'$R_{%s}$' % listnamepara[k][-1], '']
                 listscalpara[k] = 'logt'
             elif listnamepara[k][:-1] == 'rratcom':
-                listlablpara[k] = ['$R_{%s}/R_{\star}$' % listnamepara[k][-1], '']
+                listlablpara[k] = [r'$R_{%s}/R_{\star}$' % listnamepara[k][-1], '']
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'epocmtracom':
                 if boolnume:
@@ -2136,7 +2136,7 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
                 listscalpara[k] = 'logt'
             elif listnamepara[k][:-1] == 'cosicom':
                 if boolmath:
-                    listlablpara[k][0] = '$\cos i_{%s}$' % strgnume
+                    listlablpara[k][0] = r'$\cos i_{%s}$' % strgnume
                 else:
                     listlablpara[k][0] = 'Cosine of inclination%s' % strgnume
                 listlablpara[k][1] = ''
@@ -2157,55 +2157,55 @@ def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None
                 listlablpara[k] = ['$T_{%s,tr,tot}$' % (listnamepara[k][-1]), 'hours']
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'rsmacom':
-                listlablpara[k] = ['$(R_{\star}+R_{%s})/a_{%s}$' % (listnamepara[k][-1], listnamepara[k][-1]), '']
+                listlablpara[k] = [r'$(R_{\star}+R_{%s})/a_{%s}$' % (listnamepara[k][-1], listnamepara[k][-1]), '']
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'rsumcom':
-                listlablpara[k] = ['$R_{\star}+R_{%s}$' % (listnamepara[k][-1]), '']
+                listlablpara[k] = [r'$R_{\star}+R_{%s}$' % (listnamepara[k][-1]), '']
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'eccecom':
                 if boolmath:
-                    listlablpara[k][0] = '$e_{%s}$' % strgnume
+                    listlablpara[k][0] = r'$e_{%s}$' % strgnume
                 else:
                     listlablpara[k][0] = 'Eccentricity%s' % strgnume
                 listlablpara[k][1] = ''
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'arpacom':
                 if boolmath:
-                    listlablpara[k][0] = '$\omega_{%s}$' % strgnume
+                    listlablpara[k][0] = r'$\omega_{%s}$' % strgnume
                 else:
                     listlablpara[k][0] = 'Argument of periapsis%s' % strgnume
                 listlablpara[k][1] = 'deg'
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'inclcom':
                 if boolmath:
-                    listlablpara[k][0] = '$i_{%s}$' % strgnume
+                    listlablpara[k][0] = r'$i_{%s}$' % strgnume
                 else:
                     listlablpara[k][0] = 'Inclination%s' % strgnume
                 listlablpara[k][1] = 'deg'
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'loancom':
                 if boolmath:
-                    listlablpara[k][0] = '$\Omega_{%s}$' % strgnume
+                    listlablpara[k][0] = r'$\Omega_{%s}$' % strgnume
                 else:
                     listlablpara[k][0] = 'Longitude of ascending node%s' % strgnume
                 listlablpara[k][1] = 'deg'
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'depttrancom':
                 if boolmath:
-                    listlablpara[k][0] = '$\delta%s$' % strgnume
+                    listlablpara[k][0] = r'$\delta%s$' % strgnume
                 else:
                     listlablpara[k][0] = 'Transit depth%s' % strgnume
                 listlablpara[k][1] = 'ppt'
                 listscalpara[k] = 'logt'
             elif listnamepara[k][:-1] == 'offsphascom':
                 if boolmath:
-                    listlablpara[k][0] = '$\phi_{off,%s}$' % strgnume
+                    listlablpara[k][0] = r'$\phi_{off,%s}$' % strgnume
                 else:
                     listlablpara[k][0] = 'Hotspot phase offset%s' % strgnume
-                listlablpara[k][1] = '$^\circ$'
+                listlablpara[k][1] = r'$^\circ$'
                 listscalpara[k] = 'self'
             elif listnamepara[k][:-1] == 'massplancom':
-                listlablpara[k] = ['$M_{%s}$' % listnamepara[k][-1], '$M_\oplus$']
+                listlablpara[k] = [r'$M_{%s}$' % listnamepara[k][-1], r'$M_\oplus$']
                 listscalpara[k] = 'self'
             else:
                 print('')
@@ -3859,11 +3859,46 @@ def retr_fwhm(psfn, binsangl):
     return wdth
 
 
+def retr_singgaus(scaldevi, sigc):
+    """Return a circular Gaussian point-spread function."""
+
+    psfn = 1. / 2. / np.pi / sigc**2 * np.exp(-0.5 * scaldevi**2 / sigc**2)
+
+    return psfn
+
+
+def retr_singking(scaldevi, sigc, gamc):
+    """Return a circular King profile point-spread function."""
+
+    psfn = 1. / 2. / np.pi / sigc**2 * (1. - 1. / gamc) * (1. + scaldevi**2 / 2. / gamc / sigc**2)**(-gamc)
+
+    return psfn
+
+
+def retr_doubgaus(scaldevi, frac, sigc, sigt):
+    """Return a double-Gaussian point-spread function."""
+
+    psfn = frac / 2. / np.pi / sigc**2 * np.exp(-0.5 * scaldevi**2 / sigc**2) + \
+        (1. - frac) / 2. / np.pi / sigt**2 * np.exp(-0.5 * scaldevi**2 / sigt**2)
+
+    return psfn
+
+
+def retr_gausking(scaldevi, frac, sigc, sigt, gamt):
+    """Return a Gaussian-plus-King point-spread function."""
+
+    psfn = frac / 2. / np.pi / sigc**2 * np.exp(-0.5 * scaldevi**2 / sigc**2) + \
+        (1. - frac) / 2. / np.pi / sigt**2 * (1. - 1. / gamt) * (1. + scaldevi**2 / 2. / gamt / sigt**2)**(-gamt)
+
+    return psfn
+
+
 def retr_doubking(scaldevi, frac, sigc, gamc, sigt, gamt):
+    """Return a double-King point-spread function."""
 
     psfn = frac / 2. / np.pi / sigc**2 * (1. - 1. / gamc) * (1. + scaldevi**2 / 2. / gamc / sigc**2)**(-gamc) + \
         (1. - frac) / 2. / np.pi / sigt**2 * (1. - 1. / gamt) * (1. + scaldevi**2 / 2. / gamt / sigt**2)**(-gamt)
-    
+
     return psfn
 
 

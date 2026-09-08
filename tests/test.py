@@ -161,5 +161,8 @@ def cnfg_gaus():
     sampbund = mcmc.init(retr_llik_ebox, datapara, numbswep=100000, optiprop=True, gdatextr=gdat, numbburn=0, factthin=10, rtag='gausgame', numbbinsplot=100, fracrand=0.1)
 
 
-globals().get(sys.argv[1])(*sys.argv[2:])
+if len(sys.argv) > 1:
+    func = globals().get(sys.argv[1])
+    if func is not None:
+        func(*sys.argv[2:])
 
