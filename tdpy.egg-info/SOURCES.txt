@@ -1,0 +1,15 @@
+LICENSE.md
+README.md
+pyproject.toml
+setup.py
+tdpy/__init__.py
+tdpy/mcmc_depr.py
+tdpy/util.py
+tdpy.egg-info/PKG-INFO
+tdpy.egg-info/SOURCES.txt
+tdpy.egg-info/dependency_links.txt
+tdpy.egg-info/requires.txt
+tdpy.egg-info/top_level.txt
+tests/test.py
+tests/test_paths.py
+tests/test_plot_catl.py

@@ -1,0 +1,51 @@
+Metadata-Version: 2.4
+Name: tdpy
+Version: 1.2
+Summary: Numerical and visualization utilities for astrophysical workflows.
+Home-page: https://github.com/tdaylan/tdpy
+Download-URL: https://github.com/tdaylan/tdpy
+Author: Tansu Daylan
+Author-email: Tansu Daylan <tansu.daylan@gmail.com>
+License: MIT
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Requires-Python: >=3
+Description-Content-Type: text/markdown
+License-File: LICENSE.md
+Requires-Dist: astropy
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scikit-learn
+Requires-Dist: scipy
+Dynamic: author
+Dynamic: download-url
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
+# TDPY (TD's Python Library)
+
+## Introduction
+tdpy is a library with useful visualization routines and utility functions.
+
+`tdpy.plot_grid()` offers several unique features such as
+
+- one dimensional marginal distributions of each feature
+- two dimensional marginal distributions of each pair of features
+- lower triangular plot of the one and two dimensional marginal distributions
+- annotations of anomalous samples with labels in the two dimensional marginal distribution plots,
+- automated and smart positioning of annotations.
+
+
+## Installation
+
+You can install `tdpy` by running the `setup.py` script.
+```
+python setup.py install
+```
+
+

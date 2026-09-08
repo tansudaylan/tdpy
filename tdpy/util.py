@@ -3867,24 +3867,78 @@ def retr_doubking(scaldevi, frac, sigc, gamc, sigt, gamt):
     return psfn
 
 
+def plot_catl(gdat, axis, indxsideyposoffs=0, indxsidexposoffs=0):
+
+    try:
+        for k in range(gdat.numbpositext):
+            axis.text(gdat.indxsideyposdataflat[gdat.indxdatascorsort[k]] - indxsideyposoffs + gdat.numbsideedge, \
+                      gdat.indxsidexposdataflat[gdat.indxdatascorsort[k]] - indxsidexposoffs + gdat.numbsideedge, '%d' % k, size=7, color='b', alpha=0.3)
+    except Exception:
+        pass
+
+    if gdat.datatype == 'mock':
+
+        for k in gdat.indxsour:
+            axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs, \
+                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs, '*', alpha=0.1, size=15, color='y', ha='center', va='center')
+
+        for k in gdat.indxsoursupn:
+            axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs, \
+                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs, '*', alpha=0.1, size=15, color='g', ha='center', va='center')
+            axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs + 0.5, \
+                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs + 0.5, '%.3g, %.3g' % (gdat.truemagtmean[k], gdat.truemagtstdv[k]), \
+                                                                                                alpha=0.1, size=5, color='g', ha='center', va='center')
+
+
+def retr_pathenv(nameenv):
+    """Return a normalized directory path from an environment variable."""
+
+    pathbase = os.environ.get(nameenv)
+    if pathbase is None or pathbase.strip() == '':
+        raise EnvironmentError('Environment variable %s is required and cannot be empty.' % nameenv)
+
+    pathbase = os.path.abspath(os.path.expanduser(pathbase))
+    pathbase = os.path.join(pathbase, '')
+
+    return pathbase
+
+
+def retr_pathbase(strg):
+    """Return the normalized base directory defined by <STRG>_DATA_PATH."""
+
+    nameenv = '%s_DATA_PATH' % strg.upper()
+    pathbase = retr_pathenv(nameenv)
+
+    return pathbase
+
+
+def ensr_path(path):
+    """Create a directory if needed and return its normalized path."""
+
+    path = os.path.abspath(os.path.expanduser(path))
+    os.makedirs(path, exist_ok=True)
+    path = os.path.join(path, '')
+
+    return path
+
+
 def retr_path(strg, pathextndata=None, pathextnimag=None, rtag=None, onlyimag=False, onlydata=False):
-    
-    pathbase = os.environ[strg.upper() + '_DATA_PATH'] + '/'
+
+    pathbase = retr_pathbase(strg)
 
     if not onlyimag:
         pathdata = pathbase
         if pathextndata is not None:
-            pathdata += pathextndata
-        pathdata += 'data/'
-        os.system('mkdir -p %s' % pathdata)
-    if not onlydata:        
+            pathdata = os.path.join(pathdata, pathextndata)
+        pathdata = ensr_path(os.path.join(pathdata, 'data'))
+    if not onlydata:
         pathvisu = pathbase
         if pathextnimag is not None:
-            pathvisu += pathextnimag
-        pathvisu += 'visuals/'
+            pathvisu = os.path.join(pathvisu, pathextnimag)
+        pathvisu = os.path.join(pathvisu, 'visuals')
         if rtag is not None:
-            pathvisu += rtag + '/'
-        os.system('mkdir -p %s' % pathvisu)
+            pathvisu = os.path.join(pathvisu, rtag)
+        pathvisu = ensr_path(pathvisu)
 
     if not onlyimag and not onlydata:
         return pathvisu, pathdata
