@@ -1,5 +1,6 @@
 # utilities
 import os, time, datetime, dateutil
+from pathlib import Path
 
 import pickle
 from tqdm import tqdm
@@ -17,6 +18,7 @@ import matplotlib
 matplotlib.rcParams['figure.dpi']= 200
 
 import matplotlib.pyplot as plt
+import matplotlib.patches
 plt.rc('text', usetex=True)
 plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
 
@@ -31,6 +33,17 @@ import sklearn
 
 import astropy.units as u
 import tesswcs
+
+
+def narrate(typeverb, message, level=1):
+    if typeverb >= level: print(message)
+
+
+def write_text(path, text, mode='w'):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    print(f'Writing to {path}')
+    with path.open(mode) as outfile: outfile.write(text)
 
 
 def wrap_ra_deg(ra_deg):
@@ -2955,6 +2968,9 @@ def plot_timeline(
 
                   # a list of times and labels to highligh with vertical lines
                   listjdatlablhigh=None, \
+
+                  # mapping from fill colors to legend labels
+                  dictcolrlabl=None, \
                   
                   # type of plot background
                   typeplotback='white', \
@@ -3289,6 +3305,10 @@ def plot_timeline(
         axis.set_yticklabels(listlablrows)
         axis.set_ylim(limtydat)
         axis.set_xlabel('Time')
+
+        if dictcolrlabl is not None:
+            listpatch = [matplotlib.patches.Patch(facecolor=colr, edgecolor=edgecolor, alpha=0.5, label=labl) for colr, labl in dictcolrlabl.items()]
+            axis.legend(handles=listpatch, loc='lower center', bbox_to_anchor=(0.5, 1.01), ncol=min(5, len(listpatch)), fontsize='small', frameon=False)
         
         if strgtimelimt is not None:
             axis.set_xlim([minmtime, maxmtime])
