@@ -5,9 +5,34 @@ import types
 
 import numpy as np
 
+from tdpy import mcmc
 import tdpy.util as util
 from tdpy.mcmc_depr import samp as deprecated_samp
 from tdpy.util import retr_lpos, samp
+
+
+def test_mcmc_gmrb_uses_shared_implementation():
+    """The compatibility MCMC module exposes the canonical convergence helper."""
+
+    griddata = np.array([[0., 1., 2.], [1., 2., 4.], [2., 4., 5.]])
+
+    assert mcmc.gmrb_test is util.gmrb_test
+    assert mcmc.plot_gmrb is util.plot_gmrb
+    np.testing.assert_allclose(mcmc.gmrb_test(griddata), util.gmrb_test(griddata))
+
+
+def test_mcmc_autocorrelation_uses_shared_implementation():
+    """Autocorrelation compatibility paths preserve both verbosity keywords."""
+
+    samples = np.arange(24., dtype=float).reshape(8, 3)
+
+    assert mcmc.retr_atcr_neww is util.retr_atcr_neww
+    assert mcmc.retr_timeatcr is util.retr_timeatcr
+    assert mcmc.plot_atcr is util.plot_atcr
+    result_new = mcmc.retr_timeatcr(samples, typeverb=0)
+    result_legacy = mcmc.retr_timeatcr(samples, verbtype=0)
+    np.testing.assert_allclose(result_new[0], result_legacy[0])
+    assert result_new[1] == result_legacy[1]
 
 
 def test_retr_lpos_penalizes_both_gaussian_tails():

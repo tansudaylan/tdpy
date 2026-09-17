@@ -51,6 +51,33 @@ def test_save_current_figure_forwards_savefig_options(tmp_path, monkeypatch):
     plt.close(figure)
 
 
+def test_plot_atcr_uses_shared_figure_output(tmp_path, capsys):
+    path = tdpy.plot_atcr(
+        str(tmp_path) + '/',
+        np.array([1., 0.5, 0.]),
+        2.,
+        strgextn='para',
+        typefileplot='png',
+        typeplotback='dark',
+    )
+
+    assert path == str(tmp_path / 'atcrpara.png')
+    assert (tmp_path / 'atcrpara.png').is_file()
+    assert capsys.readouterr().out == 'Writing to %s...\n' % path
+
+
+def test_plot_gmrb_uses_shared_figure_output(tmp_path, capsys):
+    path = tdpy.plot_gmrb(
+        str(tmp_path) + '/',
+        np.array([1.01, 1.05, 1.1]),
+        typefileplot='png',
+    )
+
+    assert path == str(tmp_path / 'gmrb.png')
+    assert (tmp_path / 'gmrb.png').is_file()
+    assert capsys.readouterr().out == 'Writing to %s...\n' % path
+
+
 def test_load_text_data_logs_and_loads_csv(tmp_path, capsys):
     path = tmp_path / 'data.csv'
     np.savetxt(path, [[1.0, 2.0], [3.0, 4.0]], delimiter=',')

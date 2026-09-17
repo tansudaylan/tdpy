@@ -109,61 +109,6 @@ def icdf_samp_sing(samp, k, datapara):
     return sampvarb
 
 
-def gmrb_test(griddata):
-    
-    withvari = np.mean(var(griddata, 0))
-    btwnvari = griddata.shape[0] * var(np.mean(griddata, 0))
-    wgthvari = (1. - 1. / griddata.shape[0]) * withvari + btwnvari / griddata.shape[0]
-    psrf = sqrt(wgthvari / withvari)
-
-    return psrf
-
-
-def retr_atcr_neww(listpara):
-
-    numbsamp = listpara.shape[0]
-    four = sp.fftpack.fft(listpara - np.mean(listpara, axis=0), axis=0)
-    atcr = sp.fftpack.ifft(four * np.conjugate(four), axis=0).real
-    atcr /= np.amax(atcr, 0)
-    
-    return atcr[:int(numbsamp/2), ...]
-
-
-def retr_timeatcr(listpara, verbtype=1, atcrtype='maxm'):
-
-    numbsamp = listpara.shape[0]
-    listpara = listpara.reshape((numbsamp, -1))
-    numbpara = listpara.shape[1]
-
-    boolfail = False
-    if listpara.shape[0] == 1:
-        boolfail = True
-
-    atcr = retr_atcr_neww(listpara)
-    indxatcr = np.where(atcr > 0.2)
-     
-    if indxatcr[0].size == 0:
-        boolfail = True
-        timeatcr = 0
-    else:
-        if atcrtype == 'nomi':
-            timeatcr = np.argmax(indxatcr[0], axis=0)
-        if atcrtype == 'maxm':
-            indx = np.argmax(indxatcr[0])
-            indxtimemaxm = indxatcr[0][indx]
-            indxparamaxm = indxatcr[1][indx]
-            atcr = atcr[:, indxparamaxm]
-            timeatcr = indxtimemaxm
-   
-    if boolfail:
-        if atcrtype == 'maxm':
-            return np.zeros((1, 1)), 0.
-        else:
-            return np.zeros((1, numbpara)), 0.
-    else:
-        return atcr, timeatcr
-
-
 def retr_numbsamp(numbswep, numbburn, factthin):
     
     numbsamp = int((numbswep - numbburn) / factthin)
@@ -171,35 +116,6 @@ def retr_numbsamp(numbswep, numbburn, factthin):
     return numbsamp
 
 
-def plot_gmrb(path, gmrbstat):
-
-    numbbinsplot = 40
-    bins = np.linspace(1., np.amax(gmrbstat), numbbinsplot + 1)
-    figr, axis = plt.subplots()
-    axis.hist(gmrbstat, bins=bins)
-    axis.set_title('Gelman-Rubin Convergence Test')
-    axis.set_xlabel('PSRF')
-    axis.set_ylabel('$N_p$')
-    figr.savefig(path + 'gmrb.pdf')
-    plt.close(figr)
-
-
-def plot_atcr(path, atcr, timeatcr, strgextn=''):
-
-    numbsampatcr = atcr.size
-    
-    figr, axis = plt.subplots(figsize=(6, 4))
-    axis.plot(np.arange(numbsampatcr), atcr)
-    axis.set_xlabel(r'$\tau$')
-    axis.set_ylabel(r'$\xi(\tau)$')
-    axis.text(0.8, 0.8, r'$\tau_{exp} = %.3g$' % timeatcr, ha='center', va='center', transform=axis.transAxes)
-    axis.axhline(0., ls='--', alpha=0.5)
-    plt.tight_layout()
-    pathplot = path + 'atcr%s.pdf' % strgextn
-    figr.savefig(pathplot)
-    plt.close(figr)
-    
-        
 def plot_propeffi(path, numbswep, numbpara, listaccp, listindxparamodi, strgpara):
 
     indxlistaccp = np.where(listaccp == True)[0]

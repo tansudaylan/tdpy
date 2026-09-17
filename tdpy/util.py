@@ -4052,15 +4052,23 @@ def retr_psfn(gdat, psfp, indxenertemp, thisangl, psfntype, binsoaxi=None, oaxit
     return psfn
 
 
-def retr_psfpferm(gdat):
+def retr_psfpferm(gdat, gmod=None):
    
-    gdat.exproaxitype = False
+    if hasattr(gdat, 'exproaxitype'):
+        gdat.exproaxitype = False
+
+    recotype = gdat.recotype if hasattr(gdat, 'recotype') else gdat.anlytype
+    indxevtt = gdat.indxevtt if hasattr(gdat, 'indxevtt') else gdat.indxdqlt
+    numbevtt = gdat.numbevtt if hasattr(gdat, 'numbevtt') else gdat.numbdqlt
+    indxevttincl = gdat.indxevtt if hasattr(gdat, 'indxevtt') else getattr(gdat, 'indxdqltincl', indxevtt)
+    meanener = gdat.meanener if hasattr(gdat, 'meanener') else gdat.bctrpara.ener
     
-    if gdat.recotype == 'rec8':
+    if recotype.startswith('rec8'):
         path = gdat.pathdata + 'expr/irfn/psf_P8R2_SOURCE_V6_PSF.fits'
     else:
         path = gdat.pathdata + 'expr/irfn/psf_P7REP_SOURCE_V15_back.fits'
-    irfn = pf.getdata(path, 1)
+    print('Reading from %s...' % path)
+    irfn = astropy.io.fits.getdata(path, 1)
     minmener = irfn['energ_lo'].squeeze() * 1e-3 # [GeV]
     maxmener = irfn['energ_hi'].squeeze() * 1e-3 # [GeV]
     enerirfn = np.sqrt(minmener * maxmener)
@@ -4068,41 +4076,46 @@ def retr_psfpferm(gdat):
     numbpsfpscal = 3
     numbpsfpform = 5
     
-    fermscal = np.zeros((gdat.numbevtt, numbpsfpscal))
-    fermform = np.zeros((gdat.numbener, gdat.numbevtt, numbpsfpform))
+    fermscal = np.zeros((numbevtt, numbpsfpscal))
+    fermform = np.zeros((gdat.numbener, numbevtt, numbpsfpform))
     
     parastrg = ['score', 'gcore', 'stail', 'gtail', 'ntail']
-    for m in gdat.indxevtt:
-        if gdat.recotype == 'rec7':
+    for m in indxevtt:
+        if recotype.startswith('rec7'):
             if m == 0:
                 path = gdat.pathdata + 'expr/irfn/psf_P7REP_SOURCE_V15_front.fits'
             elif m == 1:
                 path = gdat.pathdata + 'expr/irfn/psf_P7REP_SOURCE_V15_back.fits'
-            irfn = pf.getdata(path, 1)
-            fermscal[m, :] = pf.getdata(path, 2)['PSFSCALE']
-        if gdat.recotype == 'rec8':
-            irfn = pf.getdata(path, 1 + 3 * gdat.indxevtt[m])
-            fermscal[m, :] = pf.getdata(path, 2 + 3 * gdat.indxevtt[m])['PSFSCALE']
+            print('Reading from %s...' % path)
+            irfn = astropy.io.fits.getdata(path, 1)
+            fermscal[m, :] = astropy.io.fits.getdata(path, 2)['PSFSCALE']
+        if recotype.startswith('rec8'):
+            irfn = astropy.io.fits.getdata(path, 1 + 3 * indxevttincl[m])
+            fermscal[m, :] = astropy.io.fits.getdata(path, 2 + 3 * indxevttincl[m])['PSFSCALE']
         for k in range(numbpsfpform):
-            fermform[:, m, k] = interp1d(enerirfn, mean(irfn[parastrg[k]].squeeze(), axis=0))(gdat.meanener)
+            fermform[:, m, k] = sp.interpolate.interp1d(enerirfn, np.mean(irfn[parastrg[k]].squeeze(), axis=0), fill_value='extrapolate')(meanener)
     # convert N_tail to f_core
-    for m in gdat.indxevtt:
+    for m in indxevtt:
         for i in gdat.indxener:
             fermform[i, m, 4] = 1. / (1. + fermform[i, m, 4] * fermform[i, m, 2]**2 / fermform[i, m, 0]**2)
 
     # calculate the scale factor
-    gdat.fermscalfact = np.sqrt((fermscal[None, :, 0] * (10. * gdat.meanener[:, None])**fermscal[None, :, 2])**2 + fermscal[None, :, 1]**2)
+    gdat.fermscalfact = np.sqrt((fermscal[None, :, 0] * (10. * meanener[:, None])**fermscal[None, :, 2])**2 + fermscal[None, :, 1]**2)
     
     # store the fermi PSF parameters
-    gdat.psfpexpr = np.zeros(gdat.numbener * gdat.numbevtt * numbpsfpform)
-    for m in gdat.indxevtt:
+    psfpexpr = np.zeros(gdat.numbener * numbevtt * numbpsfpform)
+    for m in indxevtt:
         for k in range(numbpsfpform):
             indxfermpsfptemp = m * numbpsfpform * gdat.numbener + gdat.indxener * numbpsfpform + k
             #if k == 0 or k == 2:
             #    gdat.psfpexpr[indxfermpsfptemp] = fermform[:, m, k] * gdat.fermscalfact[:, m]
             #else:
             #    gdat.psfpexpr[indxfermpsfptemp] = fermform[:, m, k]
-            gdat.psfpexpr[indxfermpsfptemp] = fermform[:, m, k]
+            psfpexpr[indxfermpsfptemp] = fermform[:, m, k]
+    if gmod is None:
+        gdat.psfpexpr = psfpexpr
+    else:
+        gmod.psfpexpr = psfpexpr
     
 
 def retr_fwhm(psfn, binsangl):
@@ -4630,7 +4643,10 @@ def retr_atcr_neww(listpara):
     return atcr[:int(numbsamp/2), ...]
 
 
-def retr_timeatcr(listpara, typeverb=1, atcrtype='maxm'):
+def retr_timeatcr(listpara, typeverb=1, atcrtype='maxm', verbtype=None):
+
+    if verbtype is not None:
+        typeverb = verbtype
 
     numbsamp = listpara.shape[0]
     listpara = listpara.reshape((numbsamp, -1))
@@ -4708,7 +4724,7 @@ def retr_numbsamp(numbswep, numbburn, factthin):
     return numbsamp
 
 
-def plot_gmrb(path, gmrbstat):
+def plot_gmrb(path, gmrbstat, typefileplot='pdf', typeplotback='norm'):
 
     numbbinsplot = 40
     bins = np.linspace(1., np.amax(gmrbstat), numbbinsplot + 1)
@@ -4717,11 +4733,13 @@ def plot_gmrb(path, gmrbstat):
     axis.set_title('Gelman-Rubin Convergence Test')
     axis.set_xlabel('PSRF')
     axis.set_ylabel('$N_p$')
-    figr.savefig(path + 'gmrb.%s' % typefileplot)
+    pathplot = save_figure(figr, path + 'gmrb', typefileplot, typeplotback)
     plt.close(figr)
 
+    return pathplot
 
-def plot_atcr(path, atcr, timeatcr, strgextn=''):
+
+def plot_atcr(path, atcr, timeatcr, strgextn='', typefileplot='pdf', typeplotback='norm'):
 
     numbsampatcr = atcr.size
     
@@ -4732,10 +4750,10 @@ def plot_atcr(path, atcr, timeatcr, strgextn=''):
     axis.text(0.8, 0.8, r'$\tau_{exp} = %.3g$' % timeatcr, ha='center', va='center', transform=axis.transAxes)
     axis.axhline(0., ls='--', alpha=0.5)
     plt.tight_layout()
-    pathplot = path + 'atcr%s.%s' % (strgextn, typefileplot)
-    figr.savefig(pathplot)
+    pathplot = save_figure(figr, path + 'atcr%s' % strgextn, typefileplot, typeplotback)
     plt.close(figr)
-    
+
+    return pathplot
         
 def plot_propeffi(path, numbswep, numbpara, listaccp, listindxparamodi, namepara):
 
