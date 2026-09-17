@@ -25,7 +25,9 @@ dependencies = [
   "numpy",
   "pandas",
   "scikit-learn",
-  "scipy"
+  "scipy",
+  "tesswcs",
+  "tqdm"
 ]
 
 [tool.setuptools.packages.find]

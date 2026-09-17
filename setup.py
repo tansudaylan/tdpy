@@ -14,7 +14,7 @@ setup(
                  'Intended Audience :: Science/Research',
                  'License :: OSI Approved :: MIT License',
                  'Programming Language :: Python'],
-    install_requires=['numpy', 'matplotlib', 'astropy', 'scipy', 'pandas', 'sklearn'],
+    install_requires=['numpy', 'matplotlib', 'astropy', 'scipy', 'pandas', 'scikit-learn', 'tesswcs', 'tqdm'],
     python_requires='>=3'
     )
 

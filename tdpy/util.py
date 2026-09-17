@@ -1,5 +1,6 @@
 # utilities
 import os, time, datetime, dateutil
+import sys
 from pathlib import Path
 
 import pickle
@@ -44,6 +45,64 @@ def write_text(path, text, mode='w'):
     path.parent.mkdir(parents=True, exist_ok=True)
     print(f'Writing to {path}')
     with path.open(mode) as outfile: outfile.write(text)
+
+
+def plot_file_path(path, typefileplot='png'):
+    """Return a plot path with the requested supported extension."""
+    if typefileplot not in {'png', 'pdf'}:
+        raise ValueError("typefileplot must be 'png' or 'pdf'")
+    return str(Path(path).with_suffix('.' + typefileplot))
+
+
+def save_figure(figr, path, typefileplot='png', typeplotback='norm', **kwargs):
+    """Save a figure with a consistent background, axes, and output format."""
+    if typeplotback not in {'norm', 'dark'}:
+        raise ValueError("typeplotback must be 'norm' or 'dark'")
+
+    path = plot_file_path(path, typefileplot)
+    color_background, color_foreground = ('white', 'black') if typeplotback == 'norm' else ('black', 'white')
+    figr.patch.set_facecolor(color_background)
+    for axis in figr.axes:
+        axis.set_facecolor(color_background)
+        axis.grid(False)
+        axis.tick_params(colors=color_foreground)
+        for spine in axis.spines.values():
+            spine.set_color(color_foreground)
+        axis.xaxis.label.set_color(color_foreground)
+        axis.yaxis.label.set_color(color_foreground)
+        axis.title.set_color(color_foreground)
+
+    arguments = {'facecolor': color_background, 'bbox_inches': 'tight'}
+    if typefileplot == 'png':
+        arguments['dpi'] = 300
+    arguments.update(kwargs)
+    print('Writing to %s...' % path)
+    figr.savefig(path, **arguments)
+    return path
+
+
+def save_current_figure(path, typefileplot='png', typeplotback='norm', **kwargs):
+    """Save the current Matplotlib figure with the standard plot styling."""
+    return save_figure(plt.gcf(), path, typefileplot, typeplotback, **kwargs)
+
+
+def load_text_data(path, delimiter=None, **kwargs):
+    """Load a text array while reporting the input path."""
+    print('Reading from %s...' % path)
+    return np.loadtxt(path, delimiter=delimiter, **kwargs)
+
+
+def dispatch_cli(namespace, arguments=None, forward_arguments=True):
+    """Run a named callable from a module namespace using command-line arguments."""
+    arguments = sys.argv[1:] if arguments is None else list(arguments)
+    if not arguments:
+        raise SystemExit('A command name is required.')
+
+    command_name, *command_arguments = arguments
+    command = namespace.get(command_name)
+    if not callable(command) or command_name.startswith('_'):
+        raise SystemExit('Unknown command: %s' % command_name)
+    return command(*(command_arguments if forward_arguments else []))
 
 
 def wrap_ra_deg(ra_deg):
@@ -3504,6 +3563,31 @@ def retr_strgtimestmp():
     return strgtimestmp
 
 
+def make_cmap(seq):
+    """Return a linear segmented colormap from colors and transition positions."""
+
+    seq = [(None,) * 3, 0.] + list(seq) + [1., (None,) * 3]
+    dictcolr = {'red': [], 'green': [], 'blue': []}
+    for indxitem, item in enumerate(seq):
+        if isinstance(item, float):
+            colrprev = seq[indxitem - 1]
+            colrnext = seq[indxitem + 1]
+            for indxcolr, namecolr in enumerate(dictcolr):
+                dictcolr[namecolr].append([item, colrprev[indxcolr], colrnext[indxcolr]])
+
+    return matplotlib.colors.LinearSegmentedColormap('CustomMap', dictcolr)
+
+
+def make_cmapdivg(strgcolrloww, strgcolrhigh):
+    """Return a white-centered diverging colormap between two named colors."""
+
+    funccolr = matplotlib.colors.ColorConverter().to_rgb
+    colrloww = funccolr(strgcolrloww)
+    colrhigh = funccolr(strgcolrhigh)
+
+    return make_cmap([colrloww, funccolr('white'), 0.5, funccolr('white'), colrhigh])
+
+
 def read_fits(path, pathvisu=None, typeverb=1):
     '''
     Read FITS file
@@ -4863,7 +4947,7 @@ def retr_lpos(para, *dictlpos):
         if retr_lpri is None:
             for k in indxpara:
                 if scalpara[k] == 'gaus':
-                    lpri += (para[k] - meangauspara[k]) / stdvgauspara[k]**2
+                    lpri += -0.5 * ((para[k] - meangauspara[k]) / stdvgauspara[k])**2
         else:
             lpri = retr_lpri(para, gdat)
         lpos = llik + lpri
@@ -5100,12 +5184,13 @@ def samp( \
             print('numbsamptotl')
             print(numbsamptotl)
 
+    pathvisu = None
     if pathbase is not None:
         pathbasesamp = pathbase + '%s/' % typesamp
         pathvisu = pathbasesamp + 'visuals/'
         pathdata = pathbasesamp + 'data/'
-        os.system('mkdir -p %s' % pathvisu)
-        os.system('mkdir -p %s' % pathdata)
+        Path(pathvisu).mkdir(parents=True, exist_ok=True)
+        Path(pathdata).mkdir(parents=True, exist_ok=True)
 
     # plotting
     ## plot limits 
@@ -5179,7 +5264,7 @@ def samp( \
                 if scalpara[m] == 'logt':
                     paraunitinitcent[m] = cdfn_logt(parainitcent[m], limtpara[0, m], limtpara[1, m])
                 if scalpara[m] == 'gaus':
-                    paraunitinitcent[m] = cdfn_logt(parainitcent[m], meanpara[m], gauspara[m])
+                    paraunitinitcent[m] = cdfn_gaus(parainitcent[m], meangauspara[m], stdvgauspara[m])
         else:
             paraunitinitcent = np.full(numbpara, 0.5)
         
@@ -5198,7 +5283,7 @@ def samp( \
                             raise Exception('')
                     parainit[k][m] = icdf_logt(paraunit, limtpara[0, m], limtpara[1, m])
                 if scalpara[m] == 'gaus':
-                    parainit[k][m] = icdf_logt(paraunit, meanpara[m], gauspara[m])
+                    parainit[k][m] = icdf_gaus(paraunit, meangauspara[m], stdvgauspara[m])
 
         if typesamp == 'mcmc':
             if booltqdm:
@@ -5245,7 +5330,14 @@ def samp( \
             listparafittwalk = objtsamp.chain
             
             # get rid of burn-in and thin
-            indxsampwalkkeep = np.linspace(numbsampburnwalk, numbsampwalk - 1, numbsamppostwalk).astype(int)
+            numbavail = numbsampwalk - numbsampburnwalk
+            if numbavail <= 0:
+                raise ValueError('No post-burn-in samples remain to retain.')
+            if numbsamppostwalk > numbavail:
+                if typeverb > 0:
+                    print('Requested post-burn-in samples (%d) exceed the available window (%d); clipping to the available window.' % (numbsamppostwalk, numbavail))
+                numbsamppostwalk = numbavail
+            indxsampwalkkeep = np.linspace(numbsampburnwalk, numbsampwalk - 1, numbsamppostwalk, dtype=int)
             listparafitt = listparafittwalk[:, indxsampwalkkeep, :].reshape((-1, numbpara))
             
             numbsampkeep = listparafitt.shape[0]
@@ -5254,9 +5346,8 @@ def samp( \
             listparaderi = None
             dictvarbderi = dict()
             if retr_dictderi is not None:
-                numbsampderi = 10
-                indxsampderi = np.random.choice(indxsampkeep, size=numbsampderi)
-                #numbsampderi = indxsampderi.size
+                numbsampderi = numbsampkeep
+                indxsampderi = indxsampkeep
 
                 print('Evaluating derived variables...')
                 listdictvarbderi = [[] for n in indxsampderi]
@@ -5276,7 +5367,7 @@ def samp( \
                         print('Encountered a None derived variable (%s). Skipping...' % strg)
                         continue
                     if np.isscalar(valu):
-                        dictvarbderi[strg] = np.empty((numbsampkeep, 1))
+                        dictvarbderi[strg] = np.empty(numbsampderi)
                     else:
                         dictvarbderi[strg] = np.empty([numbsampderi] + list(valu.shape))
                     
@@ -5291,30 +5382,8 @@ def samp( \
                 numbparaderi = len(listnameparaderi)
                 print('Placing the evaluated derived parameters in the output dictionary...')
                 listparaderi = np.empty((numbsampkeep, numbparaderi)) 
-                k = 0
-                for strg, valu in listdictvarbderi[0].items():
-                    if valu is None:
-                        continue
-                    for n in range(numbsampderi):
-                        dictvarbderi[strg][n, ...] = listdictvarbderi[n][strg]
-                    
-                    #if np.isscalar(listdictvarbderi[n][strg]) and numbsamp == numbsampderi:
-                    #    for n in indxsampkeep:
-                    #        print('')
-                    #        print('')
-                    #        print('')
-                    #        print('n, k')
-                    #        print(n, k)
-                    #        print('strg')
-                    #        print(strg)
-                    #        print('listparaderi')
-                    #        summgene(listparaderi)
-                    #        print('listdictvarbderi')
-                    #        summgene(listdictvarbderi)
-
-                    #        listparaderi[n, k] = listdictvarbderi[n][strg]
-                    #        if n == numbsampkeep - 1:
-                    #            k += 1
+                for k, strg in enumerate(listnameparaderi):
+                    listparaderi[:, k] = dictvarbderi[strg]
                 
             indxsampwalk = np.arange(numbsampwalk)
             
@@ -5362,7 +5431,8 @@ def samp( \
         
         # derived
         if dictlablscalparaderi is not None:
-            listnameparaderi = dictlablscalparaderi.keys()
+            listnameparaderi = list(dictlablscalparaderi)
+            listlablparaderi = [dictlablscalparaderi[name][0] for name in listnameparaderi]
             listlablparatotl = listlablpara + listlablparaderi
             listnameparatotl = listnamepara + listnameparaderi
             listparatotl = np.concatenate([listparafitt, listparaderi], 1)
@@ -5375,11 +5445,8 @@ def samp( \
             plot_grid(listlablpara, pathbase=pathvisu, listnamepara=listnamepara, strgextn=strgextn, listpara=listparafitt, numbpntsgrid=numbbins+1)
             
             if dictlablscalparaderi is not None:
-                listlablparaderi = []
-                for name in listnameparaderi:
-                    listlablparaderi.append(dictlablscalparaderi[name][0])
                 strgextn = 'postparaderi' + strgextn
-                plot_grid(listlablparaderi, pathbase=pathvisu, strgextn=strgextn, listnameparaderi=listnameparaderi, listpara=listparaderi, numbpntsgrid=numbbins+1)
+                plot_grid(listlablparaderi, pathbase=pathvisu, strgextn=strgextn, listnamepara=listnameparaderi, listpara=listparaderi, numbpntsgrid=numbbins+1)
                 strgextn = 'postparatotl' + strgextn
                 plot_grid(listlablparatotl, pathbase=pathvisu, strgextn=strgextn, listpara=listparatotl, numbpntsgrid=numbbins+1)
         
@@ -5391,8 +5458,8 @@ def samp( \
             print('Writing the posterior to %s...' % pathpost)
             arry = np.empty((numbparapost, 3))
             arry[:, 0] = np.median(listparatotl, 0)
-            arry[:, 1] = np.percentile(listparatotl, 84.) - arry[:, 0]
-            arry[:, 2] = arry[:, 0] - np.percentile(listparatotl, 16.)
+            arry[:, 1] = np.percentile(listparatotl, 84., axis=0) - arry[:, 0]
+            arry[:, 2] = arry[:, 0] - np.percentile(listparatotl, 16., axis=0)
             np.savetxt(pathpost, arry, delimiter=',')
             
             print('Writing the posterior derived variables to %s...' % pathpickderi)
@@ -5404,7 +5471,9 @@ def samp( \
         for k, name in enumerate(listnamepara):
             dictsamp[name] = listparafitt[:, k]
         dictsamp['lpos'] = listlposwalk[:, indxsampwalkkeep].flatten()
-        pd.DataFrame.from_dict(dictsamp).to_csv(pathdict, index=False)
+        if pathbase is not None:
+            print('Writing to %s...' % pathdict)
+            pd.DataFrame.from_dict(dictsamp).to_csv(pathdict, index=False)
         for name, valu in dictvarbderi.items():
             dictsamp[name] = valu
 

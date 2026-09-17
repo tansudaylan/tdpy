@@ -674,7 +674,11 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
         listparafittwalk = objtsamp.chain
         
         # get rid of burn-in and thin
-        indxsampwalkkeep = np.linspace(numbsampburnwalk, numbsampwalk - 1, int(numbsamp / numbwalk)).astype(int)
+        numbavail = numbsampwalk - numbsampburnwalk
+        if numbavail <= 0:
+            raise ValueError('No post-burn-in samples remain to retain.')
+        numbkeep = min(numbsampwalk, numbavail)
+        indxsampwalkkeep = np.linspace(numbsampburnwalk, numbsampwalk - 1, numbkeep, dtype=int)
         listparafitt = listparafittwalk[:, indxsampwalkkeep, :].reshape((-1, numbpara))
         
         listparaderi = None
