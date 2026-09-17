@@ -3588,6 +3588,15 @@ def make_cmapdivg(strgcolrloww, strgcolrhigh):
     return make_cmap([colrloww, funccolr('white'), 0.5, funccolr('white'), colrhigh])
 
 
+def retr_xposypos(gang, aang):
+    """Return Cartesian coordinates for a radial distance and position angle."""
+
+    xpos = gang * np.cos(aang)
+    ypos = gang * np.sin(aang)
+
+    return xpos, ypos
+
+
 def read_fits(path, pathvisu=None, typeverb=1):
     '''
     Read FITS file
@@ -4603,10 +4612,10 @@ def icdf_samp_sing(samp, k, datapara):
 
 def gmrb_test(griddata):
     
-    withvari = np.mean(var(griddata, 0))
-    btwnvari = griddata.shape[0] * var(np.mean(griddata, 0))
+    withvari = np.mean(np.var(griddata, 0))
+    btwnvari = griddata.shape[0] * np.var(np.mean(griddata, 0))
     wgthvari = (1. - 1. / griddata.shape[0]) * withvari + btwnvari / griddata.shape[0]
-    psrf = sqrt(wgthvari / withvari)
+    psrf = np.sqrt(wgthvari / withvari)
 
     return psrf
 
