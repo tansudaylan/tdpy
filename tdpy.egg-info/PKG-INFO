@@ -2,8 +2,8 @@ Metadata-Version: 2.4
 Name: tdpy
 Version: 1.2
 Summary: Numerical and visualization utilities for astrophysical workflows.
-Home-page: https://github.com/tdaylan/tdpy
-Download-URL: https://github.com/tdaylan/tdpy
+Home-page: https://github.com/tansudaylan/tdpy
+Download-URL: https://github.com/tansudaylan/tdpy
 Author: Tansu Daylan
 Author-email: Tansu Daylan <tansu.daylan@gmail.com>
 License: MIT

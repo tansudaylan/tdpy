@@ -33,7 +33,10 @@ The repository supports a standard editable install:
 ```bash
 cd tdpy
 python -m pip install -e .
+export TDPY_PATH=/path/to/tdpy
 ```
+
+`TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Dataset-specific helpers continue to use their established `*_DATA_PATH` variables.
 
 A legacy setup-based install still works for compatibility, but the modern editable install is preferred for reproducible development.
 

@@ -92,6 +92,23 @@ def load_text_data(path, delimiter=None, **kwargs):
     return np.loadtxt(path, delimiter=delimiter, **kwargs)
 
 
+def periodic_score_amplitude(event_count, false_alarm=0.003, power=0.90):
+    """Return the known-phase cosine semiamplitude at a specified power."""
+    event_count = np.asarray(event_count)
+    if np.any(event_count <= 0):
+        raise ValueError('event_count must be positive')
+    significance = scipy.stats.norm.ppf(1 - false_alarm) + scipy.stats.norm.ppf(power)
+    return significance * np.sqrt(2 / event_count)
+
+
+def periodic_score_event_count(amplitude, false_alarm=0.003, power=0.90):
+    """Return the independent-event requirement for a known-phase cosine test."""
+    amplitude = np.asarray(amplitude)
+    if np.any(amplitude <= 0):
+        raise ValueError('amplitude must be positive')
+    return (periodic_score_amplitude(1, false_alarm, power) / amplitude) ** 2
+
+
 def dispatch_cli(namespace, arguments=None, forward_arguments=True):
     """Run a named callable from a module namespace using command-line arguments."""
     arguments = sys.argv[1:] if arguments is None else list(arguments)
@@ -1694,7 +1711,7 @@ def sign_code(axis, typesigncode, typeplotback='white'):
         facecolor = typeplotback
 
     bbox = dict(boxstyle='round', edgecolor=edgecolor, facecolor=facecolor)
-    axis.text(0.97, 0.05, r'github.com/tdaylan/\textbf{%s}' % (typesigncode), bbox=bbox, \
+    axis.text(0.97, 0.05, r'github.com/tansudaylan/\textbf{%s}' % (typesigncode), bbox=bbox, \
                                                                         transform=axis.transAxes, color='firebrick', ha='right', size='small')
 
 

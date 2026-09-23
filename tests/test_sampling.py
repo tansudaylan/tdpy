@@ -11,6 +11,15 @@ from tdpy.mcmc_depr import samp as deprecated_samp
 from tdpy.util import retr_lpos, samp
 
 
+def test_periodic_score_sensitivity_is_invertible():
+    """Known-phase event requirements invert the semiamplitude sensitivity."""
+    amplitude = 0.5
+    event_count = util.periodic_score_event_count(amplitude)
+
+    assert 129 < event_count < 131
+    np.testing.assert_allclose(util.periodic_score_amplitude(event_count), amplitude)
+
+
 def test_mcmc_gmrb_uses_shared_implementation():
     """The compatibility MCMC module exposes the canonical convergence helper."""
 

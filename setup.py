@@ -7,8 +7,8 @@ setup(
     description = 'A python library of numberical routines', \
     author = 'Tansu Daylan',
     author_email = 'tansu.daylan@gmail.com',
-    url = 'https://github.com/tdaylan/tdpy',
-    download_url = 'https://github.com/tdaylan/tdpy', 
+    url = 'https://github.com/tansudaylan/tdpy',
+    download_url = 'https://github.com/tansudaylan/tdpy',
     license='MIT',
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Science/Research',
