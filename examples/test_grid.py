@@ -1,27 +1,30 @@
-import tdpy
+from pathlib import Path
+
 import numpy as np
-
-data = np.random.uniform(0, 1, (100, 5))
-
-param_labels = ["1", "2", "3", "4", "5"]
-
-# labels of the populations
-listlablpopl = ['stable']
-# number of populations
-numbpopl = len(listlablpopl)
-
-# number of features
-numbfeat = len(param_labels)
+import tdpy
 
 
-# labels of the parameters
-listlablpara = []
-for k in range(numbfeat):
-    listlablpara.append([param_labels[k], ''])
+def run_example(output_directory: Path | None = None) -> None:
+    """Generate grid diagnostics in the repository-local visuals directory."""
 
-    
-tdpy.plot_grid( 
-               np.array(listlablpara), data, listlablpopl=listlablpopl, typeplottdim='hist', 
-               pathbase=f"fig")
+    if output_directory is None:
+        output_directory = tdpy.get_visuals_path() / "grid_example"
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    random_generator = np.random.default_rng(0)
+    data = random_generator.uniform(0, 1, (100, 5))
+    parameter_labels = [[str(index + 1), ""] for index in range(data.shape[1])]
+
+    tdpy.plot_grid(
+        np.array(parameter_labels),
+        data,
+        listlablpopl=["stable"],
+        typeplottdim="hist",
+        pathbase=f"{output_directory}/",
+    )
+
+
+if __name__ == "__main__":
+    run_example()
 
 
