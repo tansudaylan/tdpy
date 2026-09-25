@@ -4199,12 +4199,12 @@ def retr_doubking(scaldevi, frac, sigc, gamc, sigt, gamt):
     return psfn
 
 
-def plot_catl(gdat, axis, indxsideyposoffs=0, indxsidexposoffs=0):
+def plot_catl(gdat, axis, indxsideyposoffs=0, indxsidexposoffs=0, annotation_alpha=0.3, label_offset=0.5):
 
     try:
         for k in range(gdat.numbpositext):
             axis.text(gdat.indxsideyposdataflat[gdat.indxdatascorsort[k]] - indxsideyposoffs + gdat.numbsideedge, \
-                      gdat.indxsidexposdataflat[gdat.indxdatascorsort[k]] - indxsidexposoffs + gdat.numbsideedge, '%d' % k, size=7, color='b', alpha=0.3)
+                      gdat.indxsidexposdataflat[gdat.indxdatascorsort[k]] - indxsidexposoffs + gdat.numbsideedge, '%d' % k, size=7, color='b', alpha=annotation_alpha)
     except Exception:
         pass
 
@@ -4212,14 +4212,14 @@ def plot_catl(gdat, axis, indxsideyposoffs=0, indxsidexposoffs=0):
 
         for k in gdat.indxsour:
             axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs, \
-                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs, '*', alpha=0.1, size=15, color='y', ha='center', va='center')
+                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs, '*', alpha=annotation_alpha, size=15, color='#B8860B', ha='center', va='center')
 
         for k in gdat.indxsoursupn:
             axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs, \
-                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs, '*', alpha=0.1, size=15, color='g', ha='center', va='center')
-            axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs + 0.5, \
-                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs + 0.5, '%.3g, %.3g' % (gdat.truemagtmean[k], gdat.truemagtstdv[k]), \
-                                                                                                alpha=0.1, size=5, color='g', ha='center', va='center')
+                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs, '*', alpha=annotation_alpha, size=15, color='g', ha='center', va='center')
+            axis.text(np.mean(gdat.trueypos[:, k]) - indxsideyposoffs + label_offset, \
+                      np.mean(gdat.truexpos[:, k]) - indxsidexposoffs + label_offset, '%.3g, %.3g' % (gdat.truemagtmean[k], gdat.truemagtstdv[k]), \
+                                                                                                alpha=annotation_alpha, size=5, color='g', ha='center', va='center')
 
 
 def retr_pathenv(nameenv):

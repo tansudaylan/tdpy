@@ -44,14 +44,13 @@ A legacy setup-based install still works for compatibility, but the modern edita
 
 The central synthetic example exercises the catalog-plotting path used by multiple time-domain workflows:
 
-```python
-from tdpy.examples.synthetic_catalog_demo import run_demo
-
-path = run_demo(output_dir='.')
-print(path)
+```bash
+python examples/catalog_overlay_diagnostic.py --typefileplot png
 ```
 
-This produces a small on-disk figure showing the input mock catalog and the diagnostic catalog overlay. It is intentionally toy data with clearly stated generative assumptions, so it demonstrates the plotting logic without pretending to represent real scientific evidence.
+![Synthetic catalog overlay diagnostic](examples/catalog_overlay_diagnostic.png)
+
+This produces a two-panel figure showing a deterministic Gaussian source field before and after catalog annotation. The three sources have mean magnitudes of 11, 12, and 13 mag. Two are isolated and one is labeled as blended. These are clearly labeled simulated inputs rather than observational evidence.
 
 ## Example workflow
 
