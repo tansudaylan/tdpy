@@ -1,6 +1,6 @@
 import pytest
 
-from tdpy.paths import get_data_path, get_repository_path, get_visuals_path
+from tdpy.paths import RepositoryPaths, get_data_path, get_repository_path, get_visuals_path
 
 
 def test_repository_runtime_paths(monkeypatch, tmp_path):
@@ -20,3 +20,14 @@ def test_repository_path_is_required(monkeypatch):
 
     with pytest.raises(EnvironmentError, match="TDPY_PATH"):
         get_repository_path()
+
+
+def test_repository_paths_supports_package_specific_configuration(monkeypatch, tmp_path):
+    """One shared resolver preserves a consumer package's environment contract."""
+
+    monkeypatch.setenv("EXAMPLE_PATH", str(tmp_path))
+    paths = RepositoryPaths("EXAMPLE_PATH")
+
+    assert paths.get_repository_path() == tmp_path
+    assert paths.get_data_path() == tmp_path / "data"
+    assert paths.get_visuals_path() == tmp_path / "visuals"

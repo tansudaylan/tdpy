@@ -26,96 +26,6 @@ import sklearn
 import tdpy.util
 from .util import *
 
-def icdf_self(paraunit, minmpara, maxmpara):
-    para = (maxmpara - minmpara) * paraunit + minmpara
-    return para
-
-
-def icdf_logt(paraunit, minmpara, maxmpara):
-    para = minmpara * np.exp(paraunit * np.log(maxmpara / minmpara))
-    return para
-
-
-def icdf_atan(paraunit, minmpara, maxmpara):
-    para = tan((arctan(maxmpara) - arctan(minmpara)) * paraunit + arctan(minmpara))
-    return para
-
-
-def icdf_gaus(cdfn, meanpara, stdvpara):
-    
-    para = meanpara + stdvpara * np.sqrt(2) * sp.special.erfinv(2. * cdfn - 1.)
-
-    return para
-
-
-def cdfn_self(para, minmpara, maxmpara):
-    paraunit = (para - minmpara) / (maxmpara - minmpara)
-    return paraunit
-
-
-def cdfn_logt(para, minmpara, maxmpara):
-    paraunit = np.log(para / minmpara) / np.log(maxmpara / minmpara)
-    return paraunit
-
-
-def cdfn_atan(para, minmpara, maxmpara):
-    paraunit = (arctan(para) - arctan(minmpara)) / (arctan(maxmpara) - arctan(minmpara))
-    return paraunit
-
-
-def cdfn_samp(sampvarb, datapara, k=None):
-    
-    if k is None:
-        samp = empty_like(sampvarb)
-        for k in range(sampvarb.size):
-            samp[k] = cdfn_samp_sing(sampvarb[k], k, datapara)
-    else:
-        samp = cdfn_samp_sing(sampvarb[k], k, datapara)
-    return samp
-
-
-def cdfn_samp_sing(sampvarb, k, datapara):
-    
-    if datapara.scal[k] == 'self':
-        samp = cdfn_self(sampvarb, datapara.minm[k], datapara.maxm[k])
-    if datapara.scal[k] == 'logt':
-        samp = cdfn_logt(sampvarb, datapara.minm[k], datapara.maxm[k])
-    if datapara.scal[k] == 'atan':
-        samp = cdfn_atan(sampvarb, datapara.minm[k], datapara.maxm[k])
-        
-    return samp
-
-
-def icdf_samp(samp, datapara, k=None):
-    
-    if k is None:
-        sampvarb = empty_like(samp)
-        for k in range(sampvarb.size):
-            sampvarb[k] = icdf_samp_sing(samp[k], k, datapara)
-    else:
-        sampvarb = icdf_samp_sing(samp[k], k, datapara)
-    return sampvarb
-
-
-def icdf_samp_sing(samp, k, datapara):
-
-    if datapara.scal[k] == 'self':
-        sampvarb = icdf_self(samp, datapara.minm[k], datapara.maxm[k])
-    if datapara.scal[k] == 'logt':
-        sampvarb = icdf_logt(samp, datapara.minm[k], datapara.maxm[k])
-    if datapara.scal[k] == 'atan':
-        sampvarb = icdf_atan(samp, datapara.minm[k], datapara.maxm[k])
-        
-    return sampvarb
-
-
-def retr_numbsamp(numbswep, numbburn, factthin):
-    
-    numbsamp = int((numbswep - numbburn) / factthin)
-    
-    return numbsamp
-
-
 def plot_propeffi(path, numbswep, numbpara, listaccp, listindxparamodi, strgpara):
 
     indxlistaccp = np.where(listaccp == True)[0]
@@ -323,25 +233,6 @@ def retr_lpos(para, *dictlpos):
     #print('')
     
     return lpos
-
-
-def retr_icdfunif(cdfn, minm, maxm):
-
-    icdf = minm + cdfn * (maxm - minm)
-    
-    return icdf
-
-
-def retr_icdf(cdfn, scalpara, minm, maxm):
-
-    numbpara = len(scalpara)
-    indxpara = np.arange(numbpara)
-    icdf = np.empty(numbpara)
-    for k in indxpara:
-        if scalpara[k] == 'self':
-            icdf[k] = minm[k] + cdfn[k] * (maxm[k] - minm[k])
-    
-    return icdf
 
 
 def opti(pathimag, retr_llik, minmpara, maxmpara, numbtopp=3, numbiter=5):

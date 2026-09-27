@@ -1,11 +1,39 @@
 """Repository-local runtime paths for TDpy."""
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
 
 
 PATH_ENV_VAR = "TDPY_PATH"
+
+
+@dataclass(frozen=True)
+class RepositoryPaths:
+    """Resolve one repository's runtime directories from its environment variable."""
+
+    environment_variable: str
+
+    def get_repository_path(self) -> Path:
+        """Return the configured repository path."""
+
+        path_value = os.environ.get(self.environment_variable)
+        if not path_value or not path_value.strip():
+            raise EnvironmentError(
+                f"{self.environment_variable} is required and cannot be empty."
+            )
+        return Path(path_value).expanduser().resolve()
+
+    def get_data_path(self) -> Path:
+        """Return the ignored repository-local data directory."""
+
+        return self.get_repository_path() / "data"
+
+    def get_visuals_path(self) -> Path:
+        """Return the ignored repository-local visualization directory."""
+
+        return self.get_repository_path() / "visuals"
 
 
 def open_narr(path: str | os.PathLike[str], mode: str = "r", **kwargs: Any) -> IO[Any]:
@@ -18,22 +46,7 @@ def open_narr(path: str | os.PathLike[str], mode: str = "r", **kwargs: Any) -> I
     return open(normalized_path, mode, **kwargs)
 
 
-def get_repository_path() -> Path:
-    """Return the repository path configured by TDPY_PATH."""
-
-    path_value = os.environ.get(PATH_ENV_VAR)
-    if not path_value or not path_value.strip():
-        raise EnvironmentError(f"{PATH_ENV_VAR} is required and cannot be empty.")
-    return Path(path_value).expanduser().resolve()
-
-
-def get_data_path() -> Path:
-    """Return the ignored repository-local data directory."""
-
-    return get_repository_path() / "data"
-
-
-def get_visuals_path() -> Path:
-    """Return the ignored repository-local visualization directory."""
-
-    return get_repository_path() / "visuals"
+_REPOSITORY_PATHS = RepositoryPaths(PATH_ENV_VAR)
+get_repository_path = _REPOSITORY_PATHS.get_repository_path
+get_data_path = _REPOSITORY_PATHS.get_data_path
+get_visuals_path = _REPOSITORY_PATHS.get_visuals_path

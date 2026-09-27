@@ -6,6 +6,7 @@ import types
 import numpy as np
 
 from tdpy import mcmc
+import tdpy.mcmc_depr as deprecated_mcmc
 import tdpy.util as util
 from tdpy.mcmc_depr import samp as deprecated_samp
 from tdpy.util import retr_lpos, samp
@@ -42,6 +43,30 @@ def test_mcmc_autocorrelation_uses_shared_implementation():
     result_legacy = mcmc.retr_timeatcr(samples, verbtype=0)
     np.testing.assert_allclose(result_new[0], result_legacy[0])
     assert result_new[1] == result_legacy[1]
+
+
+def test_deprecated_transforms_use_shared_implementations():
+    """The deprecated MCMC module reuses canonical transform helpers directly."""
+
+    names = (
+        "icdf_self",
+        "icdf_logt",
+        "icdf_atan",
+        "icdf_gaus",
+        "cdfn_self",
+        "cdfn_logt",
+        "cdfn_atan",
+        "cdfn_samp",
+        "cdfn_samp_sing",
+        "icdf_samp",
+        "icdf_samp_sing",
+        "retr_numbsamp",
+        "retr_icdfunif",
+        "retr_icdf",
+    )
+
+    for name in names:
+        assert getattr(deprecated_mcmc, name) is getattr(util, name)
 
 
 def test_retr_lpos_penalizes_both_gaussian_tails():
