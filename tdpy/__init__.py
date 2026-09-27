@@ -12,7 +12,7 @@ if not hasattr(np, 'trapz'):
     np.trapz = np.trapezoid
 
 from .util import *
-from .paths import get_data_path, get_repository_path, get_visuals_path
+from .paths import get_data_path, get_repository_path, get_visuals_path, open_narr
 
 __all__ = [
     name for name in globals()

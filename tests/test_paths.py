@@ -1,6 +1,7 @@
 import os
 
 import tdpy
+from tdpy import paths as tdpy_paths
 
 
 def test_retr_pathbase_normalizes_and_requires_env(monkeypatch, tmp_path):
@@ -44,3 +45,16 @@ def test_retr_path_creates_visual_and_data_directories(monkeypatch, tmp_path):
     assert os.path.isdir(pathvisu)
     assert os.path.normpath(pathdata).endswith(os.path.normpath('demo/data'))
     assert os.path.normpath(pathvisu).endswith(os.path.normpath('demo/visuals/case'))
+
+
+def test_open_narr_logs_normalized_reads_and_writes(tmp_path, capsys):
+    path = tmp_path / 'nested' / '..' / 'record.txt'
+    normalized_path = os.path.normpath(path)
+
+    with tdpy_paths.open_narr(path, 'w') as file_object:
+        file_object.write('catalog')
+    assert capsys.readouterr().out == f'Writing to {normalized_path}...\n'
+
+    with tdpy_paths.open_narr(path) as file_object:
+        assert file_object.read() == 'catalog'
+    assert capsys.readouterr().out == f'Reading from {normalized_path}...\n'

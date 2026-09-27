@@ -2,9 +2,20 @@
 
 import os
 from pathlib import Path
+from typing import IO, Any
 
 
 PATH_ENV_VAR = "TDPY_PATH"
+
+
+def open_narr(path: str | os.PathLike[str], mode: str = "r", **kwargs: Any) -> IO[Any]:
+    """Open a normalized path after narrating whether it is read or written."""
+
+    normalized_path = os.path.normpath(path)
+    narration = "Reading from" if mode.startswith("r") and "+" not in mode else "Writing to"
+    print(f"{narration} {normalized_path}...")
+
+    return open(normalized_path, mode, **kwargs)
 
 
 def get_repository_path() -> Path:
