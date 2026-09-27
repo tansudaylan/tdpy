@@ -86,6 +86,34 @@ def save_current_figure(path, typefileplot='png', typeplotback='norm', **kwargs)
     return save_figure(plt.gcf(), path, typefileplot, typeplotback, **kwargs)
 
 
+def rectangles_overlap(first_bounds, second_bounds):
+    """Return whether two ``(xmin, xmax, ymin, ymax)`` rectangles overlap."""
+    return not (
+        first_bounds[1] < second_bounds[0]
+        or second_bounds[1] < first_bounds[0]
+        or first_bounds[3] < second_bounds[2]
+        or second_bounds[3] < first_bounds[2]
+    )
+
+
+def padded_text_bounds(text, renderer, width_scale=1.06, height_scale=1.12):
+    """Return a Matplotlib text object's padded display-pixel bounds."""
+    bounds = text.get_window_extent(renderer=renderer).expanded(
+        width_scale, height_scale
+    )
+    return bounds.x0, bounds.x1, bounds.y0, bounds.y1
+
+
+def minimum_distance_to_polyline_pixels(point, line, maximum_samples=2000):
+    """Return the sampled minimum distance from a display-pixel point to a line."""
+    step = max(1, len(line) // maximum_samples)
+    sampled_line = line[::step]
+    distances = np.hypot(
+        sampled_line[:, 0] - point[0], sampled_line[:, 1] - point[1]
+    )
+    return float(distances.min())
+
+
 def load_text_data(path, delimiter=None, **kwargs):
     """Load a text array while reporting the input path."""
     print('Reading from %s...' % path)
@@ -313,6 +341,48 @@ def field_is_on_ccd(wcs, coord, nx=None, ny=None):
     booloccd = np.isfinite(xpix) and np.isfinite(ypix) and (0 <= xpix <= nx) and (0 <= ypix <= ny)
 
     return boolccd
+
+
+def find_apparent_retrograde_runs(
+    reference_time,
+    body='mars',
+    years_back=5,
+    days_back=None,
+    minimum_run_days=5,
+    ephemeris='builtin',
+):
+    """Return sustained daily apparent-retrograde runs before a reference time."""
+    scan_days = int(years_back * 365.25) if days_back is None else days_back  # [day]
+    times = reference_time - np.arange(scan_days)[::-1] * u.day
+    with astropy.coordinates.solar_system_ephemeris.set(ephemeris):
+        coordinates = astropy.coordinates.get_body(body, times)
+
+    right_ascension = np.unwrap(coordinates.ra.to_value(u.rad))  # [rad]
+    retrograde_indices = np.flatnonzero(np.gradient(right_ascension) < 0.)
+    if retrograde_indices.size == 0:
+        return [], times
+
+    split_indices = np.flatnonzero(np.diff(retrograde_indices) > 1) + 1
+    index_runs = np.split(retrograde_indices, split_indices)
+    runs = [
+        (int(run[0]), int(run[-1]))
+        for run in index_runs
+        if run.size >= minimum_run_days
+    ]
+    return runs, times
+
+
+def fit_fourier_series(values, sample_locations, period, harmonic_count):
+    """Fit a truncated Fourier series by linear least squares."""
+    angular_frequency = 2. * np.pi / period
+    columns = [np.ones_like(sample_locations)]
+    for harmonic_index in range(1, harmonic_count + 1):
+        phase = harmonic_index * angular_frequency * sample_locations
+        columns.extend((np.cos(phase), np.sin(phase)))
+
+    design_matrix = np.column_stack(columns)
+    coefficients, *_ = np.linalg.lstsq(design_matrix, values, rcond=None)
+    return coefficients, design_matrix @ coefficients
 
 
 def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=None, nx=None, ny=None):
