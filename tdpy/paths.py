@@ -46,6 +46,24 @@ def open_narr(path: str | os.PathLike[str], mode: str = "r", **kwargs: Any) -> I
     return open(normalized_path, mode, **kwargs)
 
 
+def make_directory(path: str | os.PathLike[str]) -> None:
+    """Create a directory and narrate the filesystem write."""
+
+    print(f"Writing to {path}...")
+    os.makedirs(path, exist_ok=True)
+
+
+def make_symlink(
+    pathorig: str | os.PathLike[str], pathlink: str | os.PathLike[str]
+) -> None:
+    """Replace a symbolic link and narrate the filesystem write."""
+
+    print(f"Writing to {pathlink}...")
+    if os.path.lexists(pathlink):
+        os.unlink(pathlink)
+    os.symlink(pathorig, pathlink)
+
+
 _REPOSITORY_PATHS = RepositoryPaths(PATH_ENV_VAR)
 get_repository_path = _REPOSITORY_PATHS.get_repository_path
 get_data_path = _REPOSITORY_PATHS.get_data_path

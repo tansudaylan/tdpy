@@ -1,6 +1,13 @@
 import pytest
 
-from tdpy.paths import RepositoryPaths, get_data_path, get_repository_path, get_visuals_path
+from tdpy.paths import (
+    RepositoryPaths,
+    get_data_path,
+    get_repository_path,
+    get_visuals_path,
+    make_directory,
+    make_symlink,
+)
 
 
 def test_repository_runtime_paths(monkeypatch, tmp_path):
@@ -31,3 +38,25 @@ def test_repository_paths_supports_package_specific_configuration(monkeypatch, t
     assert paths.get_repository_path() == tmp_path
     assert paths.get_data_path() == tmp_path / "data"
     assert paths.get_visuals_path() == tmp_path / "visuals"
+
+
+def test_narrated_filesystem_helpers_replace_symlink(tmp_path, capsys):
+    """Shared filesystem helpers create directories and replace stale links."""
+
+    directory = tmp_path / "output directory"
+    first_target = directory / "first.txt"
+    second_target = directory / "second.txt"
+    link_path = directory / "current.txt"
+
+    make_directory(directory)
+    first_target.write_text("first", encoding="utf-8")
+    second_target.write_text("second", encoding="utf-8")
+    make_symlink(first_target, link_path)
+    make_symlink(second_target, link_path)
+
+    assert link_path.read_text(encoding="utf-8") == "second"
+    assert capsys.readouterr().out.splitlines() == [
+        f"Writing to {directory}...",
+        f"Writing to {link_path}...",
+        f"Writing to {link_path}...",
+    ]
