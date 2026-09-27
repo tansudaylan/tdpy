@@ -1,6 +1,20 @@
 import pytest
-
 import tdpy
+
+from tdpy.cli import parse_plot_arguments
+
+
+def test_parse_plot_arguments_defaults_to_png():
+    assert parse_plot_arguments(arguments=[]).typefileplot == "png"
+
+
+def test_parse_plot_arguments_accepts_pdf():
+    assert parse_plot_arguments(arguments=["--typefileplot", "pdf"]).typefileplot == "pdf"
+
+
+def test_parse_plot_arguments_rejects_other_formats():
+    with pytest.raises(SystemExit):
+        parse_plot_arguments(arguments=["--typefileplot", "svg"])
 
 
 def test_dispatch_cli_forwards_arguments():
