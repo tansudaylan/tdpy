@@ -79,16 +79,4 @@ The package includes helper functions for normalized data paths:
 
 These helpers provide a consistent pattern for environment-backed data directories while avoiding hard-coded personal filesystem paths.
 
-## Testing status
-
-The package has light-weight regression tests covering:
-
-- normalized environment-backed path handling;
-- catalog-plot annotation behavior;
-- the synthetic example workflow.
-
-## Development status
-
-This repository is maintained as a shared infrastructure layer rather than a project-specific analysis package. Its scientific value is in being reusable, transparent, and stable enough for other astrophysics repositories to build on.
-
 
