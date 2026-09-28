@@ -1,10 +1,10 @@
-# tdpy — shared numerical and visualization utilities
+# TDpy numerical and visualization utilities
 
 ## Purpose
 
-`tdpy` is the shared numerical and plotting foundation for the active astrophysics ecosystem. It provides the reusable routines that keep the scientific workflows inspectable and portable: environment-aware path handling, synthetic and real-data diagnostics, plotting conventions, and foundational numerical helpers used across multiple repositories.
+TDpy provides numerical, plotting, and path-handling utilities for astrophysical analysis. Users can normalize environment-based data paths, transform scientific arrays, annotate source catalogs, and create reproducible diagnostic figures from simulated or observed data.
 
-This library is intended to hold functionality that is intentionally generic enough to be reused by many astrophysical workflows without becoming a monolithic project-specific analysis script.
+The functions are designed for direct use in scripts, notebooks, and larger analysis pipelines.
 
 ## What it provides
 
@@ -16,15 +16,12 @@ The library includes utilities for:
 - light-weight visualization utilities used across time-domain and catalog workflows;
 - reproducible output layout for figures and intermediate diagnostic products.
 
-## Current ecosystem role
+## Scientific utilities
 
-Within the broader stack, `tdpy` is the canonical shared layer for:
-
-- shared plotting conventions;
-- generic astronomy utilities;
-- normalized data-directory setup;
-- diagnostics that make intermediate workflow states visible;
-- low-level numerical support that downstream repositories can reuse instead of reimplementing.
+- configure portable data and output paths;
+- annotate source catalogs and visualize population parameters;
+- inspect intermediate analysis states with diagnostic plots;
+- apply general numerical transforms used in astronomical analyses.
 
 ## Installation
 
@@ -66,7 +63,7 @@ This keeps the scientific reasoning visible without burying calculations inside 
 
 `tdpy.plot_grid()` is the larger figure-generation entry point for parameter-grid and population diagnostics, while `tdpy.plot_catl()` is the compact catalog-plotting diagnostics helper used for structured field overlays and source annotations.
 
-These routines are designed to be reused by scientific workflows rather than copied into individual repositories.
+These routines can be called directly wherever an analysis needs consistent catalog annotations or parameter-grid diagnostics.
 
 ## Path conventions
 
