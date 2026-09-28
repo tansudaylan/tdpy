@@ -35,11 +35,9 @@ export TDPY_PATH=/path/to/tdpy
 
 `TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Dataset-specific helpers continue to use their established `*_DATA_PATH` variables.
 
-A legacy setup-based install still works for compatibility, but the modern editable install is preferred for reproducible development.
-
 ## Quick example
 
-The central synthetic example exercises the catalog-plotting path used by multiple time-domain workflows:
+The synthetic example annotates a three-source catalog on a Gaussian image:
 
 ```bash
 python examples/catalog_overlay_diagnostic.py --typefileplot png
@@ -49,31 +47,31 @@ python examples/catalog_overlay_diagnostic.py --typefileplot png
 
 This produces a two-panel figure showing a deterministic Gaussian source field before and after catalog annotation. The three sources have mean magnitudes of 11, 12, and 13 mag. Two are isolated and one is labeled as blended. These are clearly labeled simulated inputs rather than observational evidence.
 
-## Example workflow
+## Catalog annotation
 
-The demonstration follows the intended project pattern:
+The calculation contains:
 
 - input: synthetic catalog positions and magnitudes;
 - transformation: catalog overlay plotting and annotation placement;
 - output: a saved figure showing the diagnostic field view.
 
-This keeps the scientific reasoning visible without burying calculations inside a monolithic plotting script.
+The side-by-side field views expose the catalog positions, magnitudes, blend labels, and annotation placement.
 
 ## Core plotting utilities
 
-`tdpy.plot_grid()` is the larger figure-generation entry point for parameter-grid and population diagnostics, while `tdpy.plot_catl()` is the compact catalog-plotting diagnostics helper used for structured field overlays and source annotations.
+`tdpy.plot_grid()` visualizes parameter grids and population distributions. `tdpy.plot_catl()` overlays source positions, magnitudes, and annotations on image fields.
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations or parameter-grid diagnostics.
 
-## Path conventions
+## Data paths
 
-The package includes helper functions for normalized data paths:
+TDpy normalizes environment-backed input and output paths with:
 
 - `retr_pathbase()`
 - `retr_pathenv()`
 - `ensr_path()`
 - `retr_path()`
 
-These helpers provide a consistent pattern for environment-backed data directories while avoiding hard-coded personal filesystem paths.
+These functions resolve data directories and create requested output directories without workstation-specific absolute paths.
 
 
