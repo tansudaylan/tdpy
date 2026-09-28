@@ -54,12 +54,20 @@ def plot_file_path(path, typefileplot='png'):
     return str(Path(path).with_suffix('.' + typefileplot))
 
 
-def save_figure(figr, path, typefileplot='png', typeplotback='norm', **kwargs):
+def save_figure(
+    figr,
+    path,
+    typefileplot='png',
+    typeplotback='norm',
+    close_figure=False,
+    **kwargs,
+):
     """Save a figure with a consistent background, axes, and output format."""
     if typeplotback not in {'norm', 'dark'}:
         raise ValueError("typeplotback must be 'norm' or 'dark'")
 
     path = plot_file_path(path, typefileplot)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     color_background, color_foreground = ('white', 'black') if typeplotback == 'norm' else ('black', 'white')
     figr.patch.set_facecolor(color_background)
     for axis in figr.axes:
@@ -78,6 +86,8 @@ def save_figure(figr, path, typefileplot='png', typeplotback='norm', **kwargs):
     arguments.update(kwargs)
     print('Writing to %s...' % path)
     figr.savefig(path, **arguments)
+    if close_figure:
+        plt.close(figr)
     return path
 
 

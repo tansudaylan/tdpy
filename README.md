@@ -1,6 +1,6 @@
 # tdpy — shared numerical and visualization utilities
 
-## Scientific purpose
+## Purpose
 
 `tdpy` is the shared numerical and plotting foundation for the active astrophysics ecosystem. It provides the reusable routines that keep the scientific workflows inspectable and portable: environment-aware path handling, synthetic and real-data diagnostics, plotting conventions, and foundational numerical helpers used across multiple repositories.
 

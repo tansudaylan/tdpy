@@ -51,6 +51,21 @@ def test_save_current_figure_forwards_savefig_options(tmp_path, monkeypatch):
     plt.close(figure)
 
 
+def test_save_figure_creates_parent_and_optionally_closes(tmp_path):
+    figure = plt.figure()
+    figure_number = figure.number
+
+    path = tdpy.save_figure(
+        figure,
+        tmp_path / 'nested' / 'figure',
+        close_figure=True,
+    )
+
+    assert path == str(tmp_path / 'nested' / 'figure.png')
+    assert (tmp_path / 'nested' / 'figure.png').is_file()
+    assert not plt.fignum_exists(figure_number)
+
+
 def test_plot_atcr_uses_shared_figure_output(tmp_path, capsys):
     path = tdpy.plot_atcr(
         str(tmp_path) + '/',
