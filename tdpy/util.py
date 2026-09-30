@@ -682,19 +682,6 @@ def icdf_atan(paraunit, minmpara, maxmpara):
     return para
 
 
-def retr_llikgaustrun(para, gdat):
-    
-    meantria = para[0]
-    stdvtria = para[1]
-    
-    meanresu, stdvresu = scipy.stats.truncnorm.stats(gdat.a, gdat.b, loc=meantria, scale=stdvtria, moments='mv')
-    resimean = (meanresu - gdat.meanpara) / gdat.meanpara
-    resistdv = (stdvresu - gdat.stdvpara) / gdat.stdvpara
-    cost = -10. * (resimean**2 + resistdv**2)
-    
-    return cost
-
-
 def samp_gaustrun(numbsamp, meanpara, stdvpara, minmpara, maxmpara):
     '''
     Sample from a truncated Gaussian
@@ -705,46 +692,10 @@ def samp_gaustrun(numbsamp, meanpara, stdvpara, minmpara, maxmpara):
 
     if not np.isfinite(stdvpara).any():
         raise Exception('')
-
-    # scaled minimum and maximum of the truncated Gaussian
-    #gdat = gdatstrt()
-    #gdat.a = (minmpara - meanpara) / stdvpara
-    #gdat.b = (maxmpara - meanpara) / stdvpara
-    
-    #gdat.meanpara = meanpara
-    #gdat.stdvpara = stdvpara
-
-    # solve for the Gaussian mean and standard deviation that will produce the desired mean and standard deviation shen truncated
-    #from scipy.optimize import minimize
-    #obtjmini = minimize(cost_gaustrun, (meanpara, stdvpara), args=(a, b, meanpara, stdvpara), tol=1e-6, method='Nelder-Mead')
-    #meanresu, stdvresu = obtjmini.x
-   
-    ## list of parameter names
-    #listnamepara = ['meantria', 'stdvtria']
-    ## list of parameter labels and units
-    #listlablpara = [['$\mu$', ''], ['$\sigma$', '']]
-    ## list of parameter scalings
-    #listscalpara = ['self', 'self']
-    ## list of parameter minima
-    #listminmpara = [0., 0.]
-    ## list of parameter maxima
-    #listmaxmpara = [3. * meanpara, 3. * stdvpara]
-        
-    ##gdat.typemodl = typemodl
-    #path = '/Users/tdaylan/Desktop/'
-    #path = None
-    #dictparafitt, dictvarbderi = samp(gdat, path, 100, retr_llikgaustrun, \
-    #                                            listnamepara, listlablpara, listscalpara, listminmpara, listmaxmpara, \
-    #                                            numbsampburnwalk=80)#, strgextn=gdat.strgextn)
-    #meantria = np.median(dictparafitt['meantria'])
-    #stdvtria = np.median(dictparafitt['stdvtria'])
     
     a = (minmpara - meanpara) / stdvpara
     b = (maxmpara - meanpara) / stdvpara
-    meantria = meanpara
-    stdvtria = stdvpara
-    # sample from truncated Gaussian
-    para = scipy.stats.truncnorm.rvs(a, b, loc=meantria, scale=stdvtria, size=numbsamp)
+    para = scipy.stats.truncnorm.rvs(a, b, loc=meanpara, scale=stdvpara, size=numbsamp)
     
     return para
 

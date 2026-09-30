@@ -71,6 +71,19 @@ The side-by-side field views expose the catalog positions, magnitudes, blend lab
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations.
 
+## Sampling boundary
+
+TDpy provides numerical transforms and independent random variate generators such as `samp_gaustrun`, `samp_powr`, and `samp_dpow`. These functions draw directly from specified distributions and do not run Markov chain Monte Carlo (MCMC).
+
+PCAT is the sole posterior sampler in this software ecosystem. Use:
+
+- `pcat.sampling.sample()` for transdimensional catalog inference;
+- `pcat.sampling.sample_fixed()` for a fixed-dimensional model;
+- `pcat.sampling.sample_fixed_chains()` for multiple fixed-dimensional chains; and
+- `pcat.sampling.sample_posterior()` for the dictionary-style interface formerly provided by TDpy.
+
+TDpy does not expose `tdpy.mcmc`, `tdpy.samp`, or posterior-sampling compatibility wrappers. This keeps the dependency direction one-way because PCAT depends on TDpy for numerical utilities.
+
 ## TESS sky coverage and visibility
 
 `tdpy.tess` converts the Transiting Exoplanet Survey Satellite (TESS) mission pointing and detector World Coordinate Systems from `tesswcs` into reusable sky products. It provides:
