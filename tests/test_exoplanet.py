@@ -18,9 +18,7 @@ def test_kipping_limb_darkening_transforms_round_trip():
     kipping_parameters = quadratic_to_kipping_limb_darkening(*coefficients)
 
     assert kipping_parameters == pytest.approx((0.4225, 0.3076923077))
-    assert kipping_to_quadratic_limb_darkening(*kipping_parameters) == pytest.approx(
-        coefficients
-    )
+    assert kipping_to_quadratic_limb_darkening(*kipping_parameters) == pytest.approx(coefficients)
 
 
 def test_quadratic_limb_darkening_and_grid_preserve_disk_geometry():
@@ -38,9 +36,7 @@ def test_quadratic_limb_darkening_and_grid_preserve_disk_geometry():
 
 def test_interval_contrast_forecasts_preserve_paired_differences():
     centers = np.array([1.0, 1.1, 1.2, 1.3])
-    definitions = {
-        "feature": {"feature": (1.0, 1.2), "continuum": ((1.2, 1.4),)}
-    }
+    definitions = {"feature": {"feature": (1.0, 1.2), "continuum": ((1.2, 1.4),)}}
     empirical = empirical_interval_contrasts(
         centers, np.array([2.0, 2.0, 0.0, 0.0]), np.eye(4), definitions
     )
@@ -60,9 +56,7 @@ def test_interval_contrast_forecasts_preserve_paired_differences():
 def test_exoplanet_forecast_plots_write_requested_files(tmp_path):
     bands = {"feature": {"label": "X", "feature": (1.0, 1.2)}}
     centers = {"b": np.array([1.0, 1.1]), "c": np.array([1.0, 1.1])}
-    spectra = {
-        name: {"model": np.array([-1.0, 1.0])} for name in centers
-    }
+    spectra = {name: {"model": np.array([-1.0, 1.0])} for name in centers}
     atmosphere_path = plot_atmosphere_spectra(
         centers,
         spectra,

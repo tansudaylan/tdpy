@@ -123,9 +123,7 @@ def empirical_interval_contrasts(
         uncertainty = float(np.sqrt(covariance[index, index]))
         contrasts[name] = {
             "feature_range_micrometer": list(definition["feature"]),
-            "reference_ranges_micrometer": [
-                list(interval) for interval in definition["continuum"]
-            ],
+            "reference_ranges_micrometer": [list(interval) for interval in definition["continuum"]],
             "weights_by_wavelength_bin": weights[index].tolist(),
             "injected_contrast_ppm": contrast,
             "uncertainty_ppm": uncertainty,
@@ -157,17 +155,14 @@ def paired_interval_contrast_forecast(
         centers,
         [(item["feature"], item["continuum"]) for item in definitions.values()],
     )
-    covariance = sum(
-        weights @ covariance_by_dataset[name] @ weights.T for name in names
-    )
+    covariance = sum(weights @ covariance_by_dataset[name] @ weights.T for name in names)
     inverse_covariance = np.linalg.pinv(covariance)
     degrees_freedom = int(np.linalg.matrix_rank(covariance))
     critical_value = chi2.ppf(1.0 - false_positive_probability, degrees_freedom)
     models = {}
     for label in model_spectra_by_dataset[names[0]]:
         values = {
-            name: weights @ np.asarray(model_spectra_by_dataset[name][label])
-            for name in names
+            name: weights @ np.asarray(model_spectra_by_dataset[name][label]) for name in names
         }
         difference = values[names[0]] - values[names[1]]
         noncentrality = float(difference @ inverse_covariance @ difference)
@@ -332,9 +327,7 @@ def plot_paired_band_contrasts(
     positions = np.arange(len(band_definitions))
     offsets = np.linspace(-0.24, 0.24, len(plotted_cases))
     uncertainties = np.asarray(paired_forecast["difference_uncertainty_ppm"])  # [ppm]
-    for offset, (model_name, display_label, color, marker) in zip(
-        offsets, plotted_cases
-    ):
+    for offset, (model_name, display_label, color, marker) in zip(offsets, plotted_cases):
         values = np.asarray(
             paired_forecast["models"][model_name]["d_minus_e_contrast_ppm"]
         )  # [ppm]
@@ -349,9 +342,7 @@ def plot_paired_band_contrasts(
             label=display_label,
         )
     axis.axhline(0.0, color="black", linewidth=0.8)
-    axis.set_xticks(
-        positions, [definition["label"] for definition in band_definitions.values()]
-    )
+    axis.set_xticks(positions, [definition["label"] for definition in band_definitions.values()])
     figure.text(
         0.05,
         0.48,
