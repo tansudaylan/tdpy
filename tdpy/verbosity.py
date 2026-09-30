@@ -17,7 +17,10 @@ LISTNAMEPACK = ['abydos', 'aspendos', 'assos', 'chalcedon', 'ephesos', 'gordion'
 
 def retr_boolverb():
     """Return True when console output is enabled through TDPY_VERBOSITY."""
-    return os.environ.get('TDPY_VERBOSITY', '0').strip() not in ('', '0')
+    try:
+        return int(os.environ.get('TDPY_VERBOSITY', '0').strip()) > 0
+    except ValueError:
+        return False
 
 
 if not retr_boolverb():

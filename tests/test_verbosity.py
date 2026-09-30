@@ -18,3 +18,16 @@ def test_print_to_an_explicit_file_is_never_suppressed(monkeypatch):
     verbosity.print('kept', file=buffer)
     assert buffer.getvalue() == 'kept\n'
     assert verbosity.tqdm(range(3)).disable
+
+
+def test_verbosity_requires_a_positive_integer(monkeypatch):
+    for value, expected in (
+        ('1', True),
+        (' 2 ', True),
+        ('0', False),
+        ('-1', False),
+        ('false', False),
+        ('', False),
+    ):
+        monkeypatch.setenv('TDPY_VERBOSITY', value)
+        assert verbosity.retr_boolverb() is expected
