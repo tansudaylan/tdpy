@@ -8,11 +8,24 @@ Modules opt in with ``from tdpy.verbosity import print``, which shadows the buil
 import builtins
 import os
 import sys
+import warnings
+
+# packages whose own numerical and plotting warnings are silenced together with their printing
+LISTNAMEPACK = ['abydos', 'aspendos', 'assos', 'chalcedon', 'ephesos', 'gordion', 'hattusa', 'lygos', 'miletos',
+                'nicomedia', 'pcat', 'pergamon', 'sardis', 'tdpy', 'termessos', 'troia']
 
 
 def retr_boolverb():
     """Return True when console output is enabled through TDPY_VERBOSITY."""
     return os.environ.get('TDPY_VERBOSITY', '0').strip() not in ('', '0')
+
+
+if not retr_boolverb():
+    warnings.filterwarnings('ignore', module=r'(%s)(\.|$)' % '|'.join(LISTNAMEPACK))
+    # deprecation notices from dependencies concern maintenance, not results
+    for category in (DeprecationWarning, PendingDeprecationWarning, FutureWarning):
+        warnings.filterwarnings('ignore', category=category)
+    warnings.filterwarnings('ignore', message=r'.*deprecated.*')
 
 
 def print(*args, **kwargs):

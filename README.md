@@ -39,6 +39,10 @@ export TDPY_PATH=/path/to/tdpy
 
 `TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Dataset-specific helpers continue to use their established `*_DATA_PATH` variables.
 
+## Console output
+
+tdpy and the pipelines built on it (PCAT, miletos, ephesos, nicomedia, and the others in this ecosystem) print nothing by default, including progress bars and their own numerical warnings. Set `export TDPY_VERBOSITY=1` to restore progress messages, file narration, and warnings.
+
 ## Quick example
 
 The synthetic example annotates a three-source catalog on a Gaussian image:
