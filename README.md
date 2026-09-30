@@ -67,7 +67,7 @@ The side-by-side field views expose the catalog positions, magnitudes, blend lab
 
 ## Core plotting utilities
 
-`tdpy.plot_catl()` overlays source positions, magnitudes, and annotations on image fields. Corner plots of parameter samples are drawn by PCAT; pass `pcat.plot_population_grid` as `plot_posterior` to `tdpy.samp()` to plot its joint posteriors.
+`tdpy.plot_catl()` overlays source positions, magnitudes, and annotations on image fields. Corner plots of parameter samples are drawn by PCAT; posterior sampling, including `pcat.fixed.sample_posterior`, lives in PCAT.
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations.
 
