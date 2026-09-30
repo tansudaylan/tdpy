@@ -21,6 +21,8 @@ classifiers = [
 ]
 dependencies = [
   "astropy",
+  "cloudpickle",
+  "h5py",
   "matplotlib",
   "numpy",
   "pandas",

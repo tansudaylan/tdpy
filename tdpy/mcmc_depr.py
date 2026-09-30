@@ -364,7 +364,25 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
               retr_dictderi=None, \
               listlablparaderi=None, \
               diagmode=True, strgextn='', typesamp='emce', typefileplot='png', verbtype=1, strgsaveextn=None):
-        
+    if typesamp == 'nest':
+        parameter_count = len(listnamepara)
+        initial = np.asarray([(np.asarray(minmpara) + np.asarray(maxmpara)) / 2.])
+        walker_count = max(20, 2 * parameter_count)
+        chain, logprob, evidence = tdpy.util._pcat_legacy_chains(
+            gdat, retr_llik, retr_lpri, listnamepara, scalpara,
+            np.asarray(minmpara), np.asarray(maxmpara), meangauspara,
+            stdvgauspara, initial, walker_count, numbsampwalk,
+            numbsampburnwalkinit, pathimag, verbtype,
+            estimate_log_evidence=True,
+        )
+        retained = chain[:, numbsampburnwalk:, :].reshape(-1, parameter_count)
+        parameters = {name: retained[:, index] for index, name in enumerate(listnamepara)}
+        parameters['lpos'] = logprob[:, numbsampburnwalk:].ravel()
+        derived = {'log_evidence': evidence['log_evidence'],
+                   'log_evidence_relative_error': evidence['relative_error'],
+                   'evidence_effective_sample_size': evidence['effective_sample_size']}
+        return parameters, derived
+
     numbpara = len(listlablpara)
    
     if numbsampwalk <= numbsampburnwalk:
@@ -437,7 +455,7 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
                 stdvinit = 10.
                 parainit[k][m] = 0.5 / stdvinit * scipy.stats.truncnorm.rvs(-stdvinit, stdvinit) * (limtpara[1, m] - limtpara[0, m]) + parainitcent[m]
             if scalpara[m] == 'gaus':
-                parainit[k][m] = np.random.rand() * stdvpara[m] + meanpara[m] + parainitcent[m]
+                parainit[k][m] = np.random.normal(meangauspara[m], stdvgauspara[m])
         
     if typesamp == 'emce':
         if verbtype > 0:
@@ -445,8 +463,6 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
         else:
             progress = False
     
-        import emcee
-
         numbsamp = numbwalk * numbsampwalk
         indxsampwalk = np.arange(numbsampwalk)
         indxsamp = np.arange(numbsamp)
@@ -455,30 +471,12 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
             if numbsampwalk == 0:
                 raise Exception('')
     
-        if boolmult:
-            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count()-1)
-        else:
-            pool = None
-        objtsamp = emcee.EnsembleSampler(numbwalk, numbpara, retr_lpos, args=dictlpos, pool=pool)
-        if numbsampburnwalkinit > 0:
-            parainitburn, prob, state = objtsamp.run_mcmc(parainit, numbsampburnwalkinit, progress=progress)
-            if verbtype == 1:
-                print('Parameter states from the burn-in:')
-                print('parainitburn')
-                print(parainitburn)
-            parainit = np.array(parainitburn)
-            indxwalkmpos = np.argmax(objtsamp.lnprobability[:, -1], 0)
-            parainittemp = parainit[indxwalkmpos, :]
-            parainitburn = [[[] for m in indxpara] for k in indxwalk]
-            for m in indxpara:
-                for k in indxwalk:
-                    parainitburn[k][m] = parainittemp[m] * (1. + 1e-5 * np.random.randn())
-            objtsamp.reset()
-        else:
-            parainitburn = parainit
-        objtsamp.run_mcmc(parainitburn, numbsampwalk, progress=progress)
-        listlposwalk = objtsamp.lnprobability
-        listparafittwalk = objtsamp.chain
+        listparafittwalk, listlposwalk = tdpy.util._pcat_legacy_chains(
+            gdat, retr_llik, retr_lpri, listnamepara, scalpara,
+            minmpara, maxmpara, meangauspara, stdvgauspara,
+            parainit, numbwalk, numbsampwalk,
+            numbsampburnwalkinit, pathimag, verbtype,
+        )
         
         # get rid of burn-in and thin
         numbavail = numbsampwalk - numbsampburnwalk
@@ -552,66 +550,6 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
                     print('Writing to %s...' % path)
                 plt.savefig(path)
                 plt.close()
-    
-    if typesamp == 'nest':
-        import dynesty
-        from dynesty import plotting as dyplot
-        from dynesty import utils as dyutils
-        
-        dictllik = [gdat]
-        dicticdf = [scalpara, minmpara, maxmpara]
-        pool = multiprocessing.Pool(processes=multiprocessing.cpu_count()-1)
-
-        sampler = dynesty.NestedSampler(retr_llik, retr_icdf, numbpara, logl_args=dictllik, ptform_args=dicticdf, \
-                                                                    pool=pool, queue_size=multiprocessing.cpu_count(), \
-        #bound='single', \
-        #                                                                                        nlive=10, dlogz=1000. \
-        )
-        sampler.run_nested()
-        results = sampler.results
-        results.summary()
-        objtsamp = results
-        numbsamp = objtsamp['samples'].shape[0]
-        
-        # resample the nested posterior
-        weights = np.exp(results['logwt'] - results['logz'][-1])
-        listpara = dyutils.resample_equal(results.samples, weights)
-        assert listpara.size == results.samples.size
-        
-        numbsamp = listpara.shape[0]
-        indxsamp = np.arange(numbsamp)
-
-        pathbase = pathimag + '%s/' % typesamp
-        os.system('mkdir -p %s' % pathbase)
-        for keys in objtsamp:
-            if isinstance(objtsamp[keys], np.ndarray) and objtsamp[keys].size == numbsamp:
-                figr, axis = plt.subplots()
-                axis.plot(indxsamp, objtsamp[keys])
-                path = pathimag + '%s/%s%s.%s' % (typesamp, keys, strgextn, typefileplot)
-                if verbtype == 1:
-                    print('Writing to %s...' % path)
-                plt.savefig(path)
-    
-        rfig, raxes = dyplot.runplot(results)
-        path = pathimag + '%s/dyne_runs%s.%s' % (typesamp, strgextn, typefileplot)
-        if verbtype == 1:
-            print('Writing to %s...' % path)
-        plt.savefig(path)
-        plt.close()
-        
-        tfig, taxes = dyplot.traceplot(results)
-        path = pathimag + '%s/dyne_trac%s.%s' % (typesamp, strgextn, typefileplot)
-        if verbtype == 1:
-            print('Writing to %s...' % path)
-        plt.savefig(path)
-        plt.close()
-        
-        cfig, caxes = dyplot.cornerplot(results)
-        path = pathimag + '%s/dyne_corn%s.%s' % (typesamp, strgextn, typefileplot)
-        if verbtype == 1:
-            print('Writing to %s...' % path)
-        plt.savefig(path)
-        plt.close()
     
     if pathimag is not None:
         ## joint PDF

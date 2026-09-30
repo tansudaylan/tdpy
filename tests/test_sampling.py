@@ -1,7 +1,5 @@
 import pickle
 import inspect
-import sys
-import types
 
 import numpy as np
 
@@ -80,20 +78,51 @@ def test_retr_lpos_penalizes_both_gaussian_tails():
     assert np.allclose(values, [-0.5, 0., -0.5])
 
 
-def test_deprecated_samp_allows_valid_burn_in(monkeypatch):
-    class FakeSampler:
-        def __init__(self, numbwalk, numbpara, function, args, pool):
-            self.numbwalk = numbwalk
-            self.numbpara = numbpara
+def test_pcat_evidence_preserves_constant_likelihood(tmp_path):
+    def retr_llik(para, gdat):
+        return np.log(3.)
 
-        def run_mcmc(self, parainit, numbsampwalk, progress):
-            parainit = np.asarray(parainit)
-            assert np.all(np.isfinite(parainit))
-            self.chain = np.empty((self.numbwalk, numbsampwalk, self.numbpara))
-            self.chain[:, :, 0] = np.arange(self.numbwalk)[:, None]
-            self.lnprobability = np.zeros((self.numbwalk, numbsampwalk))
+    chain, logprob, evidence = util._pcat_legacy_chains(
+        None, retr_llik, None, ['x'], ['self'], np.array([0.]), np.array([1.]),
+        None, None, np.array([[0.5]]), 1, 8, 2, str(tmp_path), -1,
+        estimate_log_evidence=True, evidence_samples=300, seed=7,
+    )
+    assert chain.shape == (1, 8, 1)
+    assert logprob.shape == (1, 8)
+    assert abs(evidence['log_evidence'] - np.log(3.)) < 4 * evidence['relative_error']
+    assert evidence['relative_error'] < 0.1
 
-    monkeypatch.setitem(sys.modules, 'emcee', types.SimpleNamespace(EnsembleSampler=FakeSampler))
+
+def test_allesfitter_adapter_writes_pcat_chain_for_existing_reader(tmp_path, monkeypatch):
+    import sys
+    import types
+    import h5py
+
+    config = types.ModuleType('allesfitter.config')
+    config.init = lambda path: setattr(config, 'BASEMENT', types.SimpleNamespace(
+        datadir=path, bounds=[('uniform', 0., 1.), ('normal', 0., 1.)],
+        theta_0=np.array([0.5, 0.]), outdir=str(tmp_path / 'results'),
+        settings={'mcmc_nwalkers': 2, 'mcmc_total_steps': 12, 'mcmc_thin_by': 2},
+    ))
+    allesfitter = types.ModuleType('allesfitter')
+    allesfitter.config = config
+    monkeypatch.setitem(sys.modules, 'allesfitter', allesfitter)
+    monkeypatch.setitem(sys.modules, 'allesfitter.config', config)
+
+    def fake_pcat_chains(*args):
+        assert args[4] == ['self', 'gaus']
+        return np.ones((2, 6, 2)), np.zeros((2, 6))
+
+    monkeypatch.setattr(util, '_pcat_legacy_chains', fake_pcat_chains)
+    path = util.sample_allesfitter_pcat(str(tmp_path))
+    print('Reading from %s...' % path)
+    with h5py.File(path, 'r') as saved:
+        assert saved['mcmc/chain'].shape == (6, 2, 2)
+        assert saved['mcmc/log_prob'].shape == (6, 2)
+        assert saved['mcmc'].attrs['iteration'] == 6
+
+
+def test_deprecated_samp_allows_valid_burn_in():
 
     def retr_llik(para, gdat):
         return 0.
@@ -105,22 +134,31 @@ def test_deprecated_samp_allows_valid_burn_in(monkeypatch):
     )
 
     assert np.asarray(result['x']).size == 20 * 7
+    assert np.all(np.isfinite(result['x']))
+
+
+def test_deprecated_nested_mode_uses_pcat_evidence(tmp_path):
+    def retr_llik(para, gdat):
+        return np.log(3.)
+
+    parameters, derived = deprecated_samp(
+        None, None, 8, retr_llik, ['x'], [['X', '']], ['self'],
+        np.array([0.]), np.array([1.]), typesamp='nest',
+        numbsampburnwalk=2, verbtype=-1,
+    )
+    assert len(parameters['x']) == 20 * 6
+    assert abs(derived['log_evidence'] - np.log(3.)) < 0.1
+    assert derived['log_evidence_relative_error'] < 0.1
 
 
 def test_samp_clips_retained_post_burn_in_samples_to_available_data(monkeypatch):
-    class FakeSampler:
-        def __init__(self, numbwalk, numbpara, function, args, pool):
-            self.numbwalk = numbwalk
-            self.numbpara = numbpara
+    def fake_pcat_chains(*args):
+        initial, numbwalk, numbsampwalk = args[9:12]
+        assert np.all(np.isfinite(initial))
+        chain = np.arange(numbwalk)[:, None, None] + np.arange(numbsampwalk)[None, :, None]
+        return chain.astype(float), np.zeros((numbwalk, numbsampwalk))
 
-        def run_mcmc(self, parainit, numbsampwalk, progress):
-            parainit = np.asarray(parainit)
-            assert np.all(np.isfinite(parainit))
-            self.chain = np.empty((self.numbwalk, numbsampwalk, self.numbpara))
-            self.chain[:, :, 0] = np.arange(self.numbwalk)[:, None] + np.arange(numbsampwalk)[None, :]
-            self.lnprobability = np.zeros((self.numbwalk, numbsampwalk))
-
-    monkeypatch.setitem(sys.modules, 'emcee', types.SimpleNamespace(EnsembleSampler=FakeSampler))
+    monkeypatch.setattr(util, '_pcat_legacy_chains', fake_pcat_chains)
 
     def retr_llik(para, gdat):
         return 0.
@@ -136,23 +174,20 @@ def test_samp_clips_retained_post_burn_in_samples_to_available_data(monkeypatch)
 
 
 def test_samp_aligns_derived_results_and_summarizes_each_parameter(monkeypatch, tmp_path):
-    class FakeSampler:
-        def __init__(self, numbwalk, numbpara, function, args, pool):
-            self.numbwalk = numbwalk
-            self.numbpara = numbpara
+    def fake_pcat_chains(*args):
+        initial, numbwalk, numbsampwalk = args[9:12]
+        initial = np.asarray(initial)
+        assert np.all(np.isfinite(initial))
+        numbpara = initial.shape[1]
+        if numbpara == 2:
+            assert np.any(initial[:, 0] < 0.)
+        chain = np.empty((numbwalk, numbsampwalk, numbpara))
+        chain[:, :, 0] = np.arange(numbwalk)[:, None]
+        if numbpara == 2:
+            chain[:, :, 1] = 100. + np.arange(numbsampwalk)[None, :]
+        return chain, np.zeros((numbwalk, numbsampwalk))
 
-        def run_mcmc(self, parainit, numbsampwalk, progress):
-            parainit = np.asarray(parainit)
-            assert np.all(np.isfinite(parainit))
-            if self.numbpara == 2:
-                assert np.any(parainit[:, 0] < 0.)
-            self.chain = np.empty((self.numbwalk, numbsampwalk, self.numbpara))
-            self.chain[:, :, 0] = np.arange(self.numbwalk)[:, None]
-            if self.numbpara == 2:
-                self.chain[:, :, 1] = 100. + np.arange(numbsampwalk)[None, :]
-            self.lnprobability = np.zeros((self.numbwalk, numbsampwalk))
-
-    monkeypatch.setitem(sys.modules, 'emcee', types.SimpleNamespace(EnsembleSampler=FakeSampler))
+    monkeypatch.setattr(util, '_pcat_legacy_chains', fake_pcat_chains)
     plot_calls = []
     plot_signature = inspect.signature(util.plot_grid)
 
