@@ -22,6 +22,10 @@ The library includes utilities for:
 - annotate source catalogs and visualize population parameters;
 - inspect intermediate analysis states with diagnostic plots;
 - apply general numerical transforms used in astronomical analyses.
+- build periodic-event timing and overlap reports with `tdpy.astro`;
+- calculate interval contrasts and render atmosphere forecast figures with `tdpy.exoplanet`;
+- construct normalized NIRSpec calculations with `tdpy.pandeia`;
+- run labeled, fail-fast command sequences with `tdpy.workflow`.
 
 ## Installation
 

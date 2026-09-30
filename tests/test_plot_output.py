@@ -11,9 +11,21 @@ def test_plot_file_path_replaces_extension(tmp_path):
     assert path == str(tmp_path / 'figure.pdf')
 
 
+@pytest.mark.parametrize(('typeplotback', 'colors'), [
+    ('norm', ('white', 'black')),
+    ('white', ('white', 'black')),
+    ('dark', ('black', 'white')),
+    ('black', ('black', 'white')),
+])
+def test_plot_background_colors_supports_aliases(typeplotback, colors):
+    assert tdpy.plot_background_colors(typeplotback) == colors
+
+
 @pytest.mark.parametrize(('typefileplot', 'typeplotback', 'color'), [
     ('png', 'norm', (1.0, 1.0, 1.0, 1.0)),
+    ('png', 'white', (1.0, 1.0, 1.0, 1.0)),
     ('pdf', 'dark', (0.0, 0.0, 0.0, 1.0)),
+    ('pdf', 'black', (0.0, 0.0, 0.0, 1.0)),
 ])
 def test_save_figure_writes_styled_plot(tmp_path, capsys, typefileplot, typeplotback, color):
     figure, axis = plt.subplots()

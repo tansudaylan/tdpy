@@ -54,6 +54,25 @@ def plot_file_path(path, typefileplot='png'):
     return str(Path(path).with_suffix('.' + typefileplot))
 
 
+def normalize_plot_background(typeplotback='norm'):
+    """Return the canonical plot-background name for a supported alias."""
+    aliases = {'norm': 'norm', 'white': 'norm', 'dark': 'dark', 'black': 'dark'}
+    try:
+        return aliases[typeplotback]
+    except KeyError as exception:
+        raise ValueError(
+            "typeplotback must be 'norm', 'white', 'dark', or 'black'"
+        ) from exception
+
+
+def plot_background_colors(typeplotback='norm'):
+    """Return background and foreground colors for a supported plot theme."""
+    typeplotback = normalize_plot_background(typeplotback)
+    if typeplotback == 'norm':
+        return 'white', 'black'
+    return 'black', 'white'
+
+
 def save_figure(
     figr,
     path,
@@ -63,12 +82,9 @@ def save_figure(
     **kwargs,
 ):
     """Save a figure with a consistent background, axes, and output format."""
-    if typeplotback not in {'norm', 'dark'}:
-        raise ValueError("typeplotback must be 'norm' or 'dark'")
-
     path = plot_file_path(path, typefileplot)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    color_background, color_foreground = ('white', 'black') if typeplotback == 'norm' else ('black', 'white')
+    color_background, color_foreground = plot_background_colors(typeplotback)
     figr.patch.set_facecolor(color_background)
     for axis in figr.axes:
         axis.set_facecolor(color_background)
