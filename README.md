@@ -71,6 +71,32 @@ The side-by-side field views expose the catalog positions, magnitudes, blend lab
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations.
 
+## TESS sky coverage and visibility
+
+`tdpy.tess` converts the Transiting Exoplanet Survey Satellite (TESS) mission pointing and detector World Coordinate Systems from `tesswcs` into reusable sky products. It provides:
+
+- `tess_sector_footprints()` for the 16 camera/CCD boundaries in one sector;
+- `target_is_visible()` and `tess_target_visibility()` for on-silicon checks;
+- `plot_tess_sector_map()` and `plot_tess_sector_sequence()` for full-sky maps;
+- `plot_tess_visibility()` for target-by-sector coverage matrices; and
+- `animate_tess_sectors()` for fixed-frame full-sky GIFs over time.
+
+Run the maintained example with:
+
+```bash
+python examples/tess_visibility/tess_visibility.py --sectors 1 2 3 4
+```
+
+![TESS Sectors 1-4 full-sky footprints and target visibility](examples/tess_visibility/visuals/tess_sectors_combined.png)
+
+![TESS target-by-sector visibility matrix](examples/tess_visibility/visuals/tess_target_visibility.png)
+
+![TESS sector sequence across the full sky](examples/tess_visibility/visuals/tess_sector_sequence.gif)
+
+The inputs are integer sector numbers and optional named International Celestial Reference System coordinates in degrees. The example marks the real catalog positions of Beta Pictoris, TOI-700, and the Large Magellanic Cloud. These coordinates illustrate visibility and do not represent new observations. Each target is transformed through all 16 sector CCD World Coordinate Systems and is visible only when its pixel coordinate falls on silicon.
+
+Static figures are written directly under `examples/tess_visibility/visuals/`. The example also writes one map per sector. Runtime and memory scale linearly with the number of sectors and targets. Four sectors with three targets complete in several seconds on a laptop. The footprint boundary follows the nominal detector geometry in `tesswcs`; it does not model scattered light, data-quality masks, cadence availability, or target-specific postage-stamp allocation.
+
 ## Data paths
 
 TDpy normalizes environment-backed input and output paths with:

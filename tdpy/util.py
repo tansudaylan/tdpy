@@ -22,8 +22,6 @@ matplotlib.rcParams['figure.dpi']= 200
 
 import matplotlib.pyplot as plt
 import matplotlib.patches
-plt.rc('text', usetex=True)
-plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
 
 # paralel processing
 import multiprocessing
@@ -35,7 +33,14 @@ import astropy.io
 import sklearn
 
 import astropy.units as u
-import tesswcs
+
+from .plotting import (
+    normalize_plot_background,
+    plot_background_colors,
+    plot_file_path,
+    save_current_figure,
+    save_figure,
+)
 
 
 def narrate(typeverb, message, level=1):
@@ -47,71 +52,6 @@ def write_text(path, text, mode='w'):
     path.parent.mkdir(parents=True, exist_ok=True)
     print(f'Writing to {path}')
     with path.open(mode) as outfile: outfile.write(text)
-
-
-def plot_file_path(path, typefileplot='png'):
-    """Return a plot path with the requested supported extension."""
-    if typefileplot not in {'png', 'pdf'}:
-        raise ValueError("typefileplot must be 'png' or 'pdf'")
-    return str(Path(path).with_suffix('.' + typefileplot))
-
-
-def normalize_plot_background(typeplotback='norm'):
-    """Return the canonical plot-background name for a supported alias."""
-    aliases = {'norm': 'norm', 'white': 'norm', 'dark': 'dark', 'black': 'dark'}
-    try:
-        return aliases[typeplotback]
-    except KeyError as exception:
-        raise ValueError(
-            "typeplotback must be 'norm', 'white', 'dark', or 'black'"
-        ) from exception
-
-
-def plot_background_colors(typeplotback='norm'):
-    """Return background and foreground colors for a supported plot theme."""
-    typeplotback = normalize_plot_background(typeplotback)
-    if typeplotback == 'norm':
-        return 'white', 'black'
-    return 'black', 'white'
-
-
-def save_figure(
-    figr,
-    path,
-    typefileplot='png',
-    typeplotback='norm',
-    close_figure=False,
-    **kwargs,
-):
-    """Save a figure with a consistent background, axes, and output format."""
-    path = plot_file_path(path, typefileplot)
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    color_background, color_foreground = plot_background_colors(typeplotback)
-    figr.patch.set_facecolor(color_background)
-    for axis in figr.axes:
-        axis.set_facecolor(color_background)
-        axis.grid(False)
-        axis.tick_params(colors=color_foreground)
-        for spine in axis.spines.values():
-            spine.set_color(color_foreground)
-        axis.xaxis.label.set_color(color_foreground)
-        axis.yaxis.label.set_color(color_foreground)
-        axis.title.set_color(color_foreground)
-
-    arguments = {'facecolor': color_background, 'bbox_inches': 'tight'}
-    if typefileplot == 'png':
-        arguments['dpi'] = 300
-    arguments.update(kwargs)
-    print('Writing to %s...' % path)
-    figr.savefig(path, **arguments)
-    if close_figure:
-        plt.close(figr)
-    return path
-
-
-def save_current_figure(path, typefileplot='png', typeplotback='norm', **kwargs):
-    """Save the current Matplotlib figure with the standard plot styling."""
-    return save_figure(plt.gcf(), path, typefileplot, typeplotback, **kwargs)
 
 
 def rectangles_overlap(first_bounds, second_bounds):
@@ -363,12 +303,16 @@ def split_on_wrap(x, y, thresh=np.pi / 2):
 
 
 def field_is_on_ccd(wcs, coord, nx=None, ny=None):
-    
+    """Return whether a coordinate falls within a detector's pixel bounds."""
+    nx = 2048 if nx is None else nx
+    ny = 2048 if ny is None else ny
     xpix, ypix = wcs.world_to_pixel(coord)
-    
-    booloccd = np.isfinite(xpix) and np.isfinite(ypix) and (0 <= xpix <= nx) and (0 <= ypix <= ny)
-
-    return boolccd
+    return bool(
+        np.isfinite(xpix)
+        and np.isfinite(ypix)
+        and 0 <= xpix <= nx
+        and 0 <= ypix <= ny
+    )
 
 
 def find_apparent_retrograde_runs(
@@ -414,8 +358,14 @@ def fit_fourier_series(values, sample_locations, period, harmonic_count):
 
 
 def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=None, nx=None, ny=None):
+    """Plot LSST deep-drilling fields over TESS footprints.
 
-    FIELDS = [
+    This compatibility wrapper delegates mission geometry and rendering to
+    :mod:`tdpy.tess`.
+    """
+    from .tess import plot_tess_sector_map
+
+    default_fields = [
         ('ELAISS', 19.45, -44.02),
         ('XMM-LSS', 35.57, -4.82),
         ('ECDFS', 52.98, -28.12),
@@ -423,106 +373,19 @@ def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=None, nx=None,
         ('EDFS_b', 63.60, -47.60),
         ('COSMOS', 150.11, 2.23),
     ]
-
-
-    NX = 2048
-    NY = 2048
-
-    if isinstance(tess_sectors, int):
-        sectors = [tess_sectors]
-    else:
-        sectors = list(tess_sectors)
-
-    os.makedirs(output_dir, exist_ok=True)
-
+    fields = default_fields if fields is None else fields
+    sectors = [tess_sectors] if isinstance(tess_sectors, int) else list(tess_sectors)
+    targets = {name: (ra_deg, dec_deg) for name, ra_deg, dec_deg in fields}
     if len(sectors) == 1:
         filename = f'Sector{sectors[0]}_DDF.png'
     else:
         filename = f'lsst_ddf_tess_sectors_{sectors[0]}_{sectors[-1]}.png'
-
-    output_path = os.path.join(output_dir, filename)
-
-    field_sector_map = {}
-
-    for name, ra_deg, dec_deg in fields:
-        coord = SkyCoord(ra_deg * u.deg, dec_deg * u.deg, frame='icrs')
-        covered = []
-
-        for sector in sectors:
-            hit = False
-            for camera in [1, 2, 3, 4]:
-                for ccd in [1, 2, 3, 4]:
-                    wcs = tesswcs.WCS.from_sector(sector=sector, camera=camera, ccd=ccd)
-                    if field_is_on_ccd(wcs, coord, nx=nx, ny=ny):
-                        hit = True
-                        break
-                if hit:
-                    break
-            if hit:
-                covered.append(sector)
-
-        field_sector_map[name] = covered
-
-    for name, covered in field_sector_map.items():
-        print('%s: %s' % (name, covered))
-
-    fig = plt.figure(figsize=(14, 8))
-    ax = fig.add_subplot(111, projection='mollweide')
-    ax.grid(True, alpha=0.3)
-
-    for sector in sectors:
-        for camera in [1, 2, 3, 4]:
-            for ccd in [1, 2, 3, 4]:
-                wcs = tesswcs.WCS.from_sector(sector=sector, camera=camera, ccd=ccd)
-                xpix = np.array([0, 0, nx, nx, 0], dtype=float)
-                ypix = np.array([0, ny, ny, 0, 0], dtype=float)
-
-                sky = wcs.pixel_to_world(xpix, ypix)
-
-                ra = wrap_ra_deg(sky.ra.deg)
-                dec = sky.dec.deg
-
-                x = np.deg2rad(ra)
-                y = np.deg2rad(dec)
-
-                for xs, ys in split_on_wrap(x, y):
-                    if len(sectors) == 1:
-                        ax.plot(xs, ys, lw=0.6, alpha=0.4, color='tab:blue')
-                    else:
-                        ax.plot(xs, ys, lw=0.4, alpha=0.22, color='tab:blue')
-
-    for name, ra_deg, dec_deg in fields:
-        x = np.deg2rad(wrap_ra_deg(ra_deg))
-        y = np.deg2rad(dec_deg)
-
-        covered = field_sector_map[name]
-        label = '%s (%s)' % (name, ','.join([str(s) for s in covered]) if covered else 'none')
-
-        ax.scatter(x, y, s=60, marker='*', color='tab:red', zorder=5)
-        ax.text(x, y + np.deg2rad(2.0), label, ha='center', va='bottom', fontsize=9)
-
-    tick_degs = np.arange(-150, 181, 30)
-    tick_labels = [f'{int((360 - d) % 360)}°' for d in tick_degs]
-
-    ax.set_xticks(np.deg2rad(tick_degs))
-    ax.set_xticklabels(tick_labels)
-
-    ax.set_xlabel('Right Ascension')
-    ax.set_ylabel('Declination')
-
-    if len(sectors) == 1:
-        ax.set_title(f'LSST DDF Fields and TESS Sector {sectors[0]} Footprint')
-    else:
-        ax.set_title(f'LSST DDF Fields and TESS Sectors {sectors[0]}–{sectors[-1]} Footprint')
-
-    plt.tight_layout()
-
-    print('Writing to %s...' % output_path)
-
-    plt.savefig(output_path, bbox_inches='tight')
-    plt.close()
-
-    return field_sector_map, output_path
+    visibility, output_path = plot_tess_sector_map(
+        sectors,
+        Path(output_dir) / filename,
+        targets=targets,
+    )
+    return {name: list(covered) for name, covered in visibility.items()}, str(output_path)
 
 
 def calc_visitarg(rasctarg, decltarg, latiobvt, longobvt, strgtimeobvtyear, listdelttimeobvtyear, heigobvt=None):

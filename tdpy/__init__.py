@@ -16,7 +16,9 @@ if not hasattr(np, 'trapz'):
 from .astro import *
 from .numerics import *
 from .pandeia import *
+from .plotting import *
 from .serialization import *
+from .tess import *
 from .paths import RepositoryPaths, get_data_path, get_repository_path, get_visuals_path, open_narr
 
 __all__ = [
