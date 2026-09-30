@@ -5099,10 +5099,19 @@ def retr_lpos(para, *dictlpos):
     return lpos
 
 
+_pcat_callback_cache = {}
+
+
 def _pcat_legacy_llik(gdat, strgmodl, para):
     import cloudpickle
 
-    legacy_gdat, legacy_llik, legacy_lpri = cloudpickle.loads(gdat.legacy_payload)
+    payload = gdat.legacy_payload
+    key = id(payload)
+    if key not in _pcat_callback_cache or _pcat_callback_cache[key][0] is not payload:
+        if len(_pcat_callback_cache) >= 8:
+            _pcat_callback_cache.pop(next(iter(_pcat_callback_cache)))
+        _pcat_callback_cache[key] = (payload, cloudpickle.loads(payload))
+    legacy_gdat, legacy_llik, legacy_lpri = _pcat_callback_cache[key][1]
     llik = legacy_llik(para, legacy_gdat)
     if legacy_lpri is not None:
         llik += legacy_lpri(para, legacy_gdat)
