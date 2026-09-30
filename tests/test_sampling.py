@@ -97,7 +97,7 @@ def test_allesfitter_adapter_writes_pcat_chain_for_existing_reader(tmp_path, mon
     import sys
     import types
     import h5py
-    import pcat.fixed as fixed
+    import pcat.fixed as pcat_fixed
 
     config = types.ModuleType('allesfitter.config')
     config.init = lambda path: setattr(config, 'BASEMENT', types.SimpleNamespace(
@@ -114,7 +114,7 @@ def test_allesfitter_adapter_writes_pcat_chain_for_existing_reader(tmp_path, mon
         assert args[4] == ['self', 'gaus']
         return np.ones((2, 6, 2)), np.zeros((2, 6))
 
-    monkeypatch.setattr(fixed, 'sample_fixed_chains', fake_pcat_chains)
+    monkeypatch.setattr(pcat_fixed, 'sample_fixed_chains', fake_pcat_chains)
     path = util.sample_allesfitter_pcat(str(tmp_path))
     print('Reading from %s...' % path)
     with h5py.File(path, 'r') as saved:

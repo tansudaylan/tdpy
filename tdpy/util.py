@@ -5053,7 +5053,7 @@ def _pcat_legacy_chains(gdat, retr_llik, retr_lpri, names, scales, minima, maxim
                         means, stdvs, initial, numbwalk, numbsampwalk,
                         numbsampburnwalkinit, pathbase, typeverb,
                         estimate_log_evidence=False, evidence_samples=4000, seed=None):
-    from pcat.fixed import sample_fixed_chains
+    from pcat.sampling import sample_fixed_chains
 
     return sample_fixed_chains(
         gdat, retr_llik, retr_lpri, names, scales, minima, maxima,
@@ -5065,7 +5065,7 @@ def _pcat_legacy_chains(gdat, retr_llik, retr_lpri, names, scales, minima, maxim
 
 def sample_allesfitter_pcat(datadir):
     """Compatibility forwarding for existing tdpy integrations."""
-    from pcat.fixed import sample_allesfitter_pcat as sample_with_pcat
+    from pcat.sampling import sample_allesfitter_pcat as sample_with_pcat
 
     return sample_with_pcat(datadir)
 

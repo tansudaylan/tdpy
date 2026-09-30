@@ -30,3 +30,11 @@ except ImportError:
             globals()[_name] = getattr(_tdpy, _name)
 
     __all__ = [name for name in dir(_tdpy) if not name.startswith('_')]
+
+
+def __getattr__(name):
+    """Forward lazy legacy exports to the package implementation."""
+    implementation = sys.modules.get(f'{__name__}.tdpy', globals().get('_tdpy'))
+    if implementation is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(implementation, name)
