@@ -1,4 +1,6 @@
 # numerics
+
+from tdpy.verbosity import print
 import numpy as np
 
 import scipy as sp

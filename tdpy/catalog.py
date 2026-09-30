@@ -1,5 +1,7 @@
 """Reusable synthetic catalog diagnostics for plotting workflows."""
 
+from tdpy.verbosity import print
+
 from pathlib import Path
 
 import matplotlib

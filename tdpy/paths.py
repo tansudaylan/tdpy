@@ -1,5 +1,7 @@
 """Repository-local runtime paths for TDpy."""
 
+from tdpy.verbosity import print
+
 import os
 from dataclasses import dataclass
 from pathlib import Path

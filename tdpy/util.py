@@ -1,10 +1,12 @@
 # utilities
+
+from tdpy.verbosity import print
 import os, time, datetime, dateutil
 import sys
 from pathlib import Path
 
 import pickle
-from tqdm import tqdm
+from tdpy.verbosity import tqdm
 
 ## numerics
 import numpy as np
@@ -3089,10 +3091,10 @@ def retr_indximagmaxm(data):
 
     sizeneig = 10
     cntpthrs = 10
-    maxmdata = sp.ndimage.filters.maximum_filter(data, sizeneig)
+    maxmdata = sp.ndimage.maximum_filter(data, sizeneig)
     
     boolmaxm = (data == maxmdata)
-    minmdata = sp.ndimage.filters.minimum_filter(data, sizeneig)
+    minmdata = sp.ndimage.minimum_filter(data, sizeneig)
     diff = ((maxmdata - minmdata) > cntpthrs)
     boolmaxm[diff == 0] = 0
     mapslabl, numbobjt = sp.ndimage.label(boolmaxm)

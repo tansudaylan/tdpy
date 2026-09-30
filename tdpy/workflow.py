@@ -1,5 +1,7 @@
 """Small helpers for reproducible command workflows."""
 
+from tdpy.verbosity import print
+
 from collections.abc import Mapping, Sequence
 import os
 from pathlib import Path

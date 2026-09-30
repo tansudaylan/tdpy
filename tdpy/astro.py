@@ -1,5 +1,7 @@
 """Reusable astronomy calculations for observation planning."""
 
+from tdpy.verbosity import print
+
 from datetime import datetime
 from collections.abc import Mapping
 import csv
