@@ -1,5 +1,4 @@
 import pickle
-import inspect
 
 import numpy as np
 
@@ -217,13 +216,10 @@ def test_samp_aligns_derived_results_and_summarizes_each_parameter(monkeypatch, 
 
     monkeypatch.setattr(util, '_pcat_legacy_chains', fake_pcat_chains)
     plot_calls = []
-    plot_signature = inspect.signature(util.plot_grid)
 
     def check_plot_call(*args, **kwargs):
-        plot_signature.bind(*args, **kwargs)
         plot_calls.append(kwargs)
 
-    monkeypatch.setattr(util, 'plot_grid', check_plot_call)
     monkeypatch.setattr(util.plt, 'savefig', lambda path: None)
 
     def retr_llik(para, gdat):
@@ -239,7 +235,7 @@ def test_samp_aligns_derived_results_and_summarizes_each_parameter(monkeypatch, 
         ['gaus', 'self'], np.array([-10., 0.]), np.array([10., 200.]), pathbase=pathbase,
         numbsamppostwalk=3, meangauspara=np.array([0., 0.]), stdvgauspara=np.array([1., 1.]),
         retr_dictderi=retr_dictderi, dictlablscalparaderi={'sum': ['Sum', '']}, boolplot=True,
-        booltqdm=False, typeverb=0,
+        booltqdm=False, typeverb=0, plot_posterior=check_plot_call,
     )
 
     assert result['sum'].shape == (60,)

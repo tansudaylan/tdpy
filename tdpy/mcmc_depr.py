@@ -363,7 +363,9 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
               # derivation
               retr_dictderi=None, \
               listlablparaderi=None, \
-              diagmode=True, strgextn='', typesamp='emce', typefileplot='png', verbtype=1, strgsaveextn=None):
+              diagmode=True, strgextn='', typesamp='emce', typefileplot='png', verbtype=1, strgsaveextn=None, \
+              # callable(path, name, samples, labels) drawing joint posteriors with PCAT's compact corner plotter
+              plot_posterior=None):
     if typesamp == 'nest':
         parameter_count = len(listnamepara)
         initial = np.asarray([(np.asarray(minmpara) + np.asarray(maxmpara)) / 2.])
@@ -553,19 +555,19 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
                 plt.savefig(path)
                 plt.close()
     
-    if pathimag is not None:
+    if pathimag is not None and plot_posterior is not None:
         ## joint PDF
         strgplot = 'postparafitt' + strgextn
-        plot_grid(pathimag, strgplot, listparafitt, listlablpara, numbbinsplot=numbbins)
+        plot_posterior(pathimag, strgplot, listparafitt, listlablpara, numbbinsplot=numbbins)
         
         # derived
         if retr_dictderi is not None:
             listlablparatotl = listlablpara + listlablparaderi
             listparatotl = np.concatenate([listparafitt, listparaderi], 1)
             strgplot = 'postparaderi' + strgextn
-            plot_grid(pathimag, strgplot, listparaderi, listlablparaderi, numbbinsplot=numbbins)
+            plot_posterior(pathimag, strgplot, listparaderi, listlablparaderi, numbbinsplot=numbbins)
             strgplot = 'postparatotl' + strgextn
-            plot_grid(pathimag, strgplot, listparatotl, listlablparatotl, numbbinsplot=numbbins)
+            plot_posterior(pathimag, strgplot, listparatotl, listlablparatotl, numbbinsplot=numbbins)
     
     if strgsaveextn is not None:
         print('Writing to the initial state from %s...' % strgsaveextn)
