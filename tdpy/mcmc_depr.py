@@ -485,6 +485,8 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
         numbkeep = min(numbsampwalk, numbavail)
         indxsampwalkkeep = np.linspace(numbsampburnwalk, numbsampwalk - 1, numbkeep, dtype=int)
         listparafitt = listparafittwalk[:, indxsampwalkkeep, :].reshape((-1, numbpara))
+        numbsamp = listparafitt.shape[0]
+        indxsamp = np.arange(numbsamp)
         
         listparaderi = None
         dictparaderi = dict()
@@ -572,7 +574,7 @@ def samp(gdat, pathimag, numbsampwalk, retr_llik, \
     dictparafitt = dict()
     for k, name in enumerate(listnamepara):
         dictparafitt[name] = listparafitt[:, k]
-    dictparafitt['lpos'] = listlposwalk.flatten()
+    dictparafitt['lpos'] = listlposwalk[:, indxsampwalkkeep].flatten()
     
     return dictparafitt, dictparaderi
 

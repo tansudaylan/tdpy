@@ -97,6 +97,7 @@ def test_allesfitter_adapter_writes_pcat_chain_for_existing_reader(tmp_path, mon
     import sys
     import types
     import h5py
+    import pcat.fixed as fixed
 
     config = types.ModuleType('allesfitter.config')
     config.init = lambda path: setattr(config, 'BASEMENT', types.SimpleNamespace(
@@ -113,7 +114,7 @@ def test_allesfitter_adapter_writes_pcat_chain_for_existing_reader(tmp_path, mon
         assert args[4] == ['self', 'gaus']
         return np.ones((2, 6, 2)), np.zeros((2, 6))
 
-    monkeypatch.setattr(util, '_pcat_legacy_chains', fake_pcat_chains)
+    monkeypatch.setattr(fixed, 'sample_fixed_chains', fake_pcat_chains)
     path = util.sample_allesfitter_pcat(str(tmp_path))
     print('Reading from %s...' % path)
     with h5py.File(path, 'r') as saved:
@@ -160,6 +161,7 @@ def test_deprecated_samp_allows_valid_burn_in():
     )
 
     assert np.asarray(result['x']).size == 20 * 7
+    assert np.asarray(result['lpos']).size == 20 * 7
     assert np.all(np.isfinite(result['x']))
 
 

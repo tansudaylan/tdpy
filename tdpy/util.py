@@ -4737,61 +4737,31 @@ def icdf_samp_sing(samp, k, datapara):
 
 
 def gmrb_test(griddata):
-    
-    withvari = np.mean(np.var(griddata, 0))
-    btwnvari = griddata.shape[0] * np.var(np.mean(griddata, 0))
-    wgthvari = (1. - 1. / griddata.shape[0]) * withvari + btwnvari / griddata.shape[0]
-    psrf = np.sqrt(wgthvari / withvari)
+    from pcat.diagnostics import gelman_rubin
 
-    return psrf
+    return gelman_rubin(griddata)
 
 
 def retr_atcr_neww(listpara):
+    from pcat.diagnostics import autocorrelation_time
 
-    numbsamp = listpara.shape[0]
-    four = sp.fftpack.fft(listpara - np.mean(listpara, axis=0), axis=0)
-    atcr = sp.fftpack.ifft(four * np.conjugate(four), axis=0).real
-    atcr /= np.amax(atcr, 0)
-    
-    return atcr[:int(numbsamp/2), ...]
+    correlations, _ = autocorrelation_time(listpara)
+    return np.moveaxis(correlations, -1, 0)
 
 
 def retr_timeatcr(listpara, typeverb=1, atcrtype='maxm', verbtype=None):
+    from pcat.diagnostics import autocorrelation_time
 
     if verbtype is not None:
         typeverb = verbtype
-
-    numbsamp = listpara.shape[0]
-    listpara = listpara.reshape((numbsamp, -1))
-    numbpara = listpara.shape[1]
-
-    boolfail = False
-    if listpara.shape[0] == 1:
-        boolfail = True
-
-    atcr = retr_atcr_neww(listpara)
-    indxatcr = np.where(atcr > 0.2)
-     
-    if indxatcr[0].size == 0:
-        boolfail = True
-        timeatcr = 0
-    else:
-        if atcrtype == 'nomi':
-            timeatcr = np.argmax(indxatcr[0], axis=0)
-        if atcrtype == 'maxm':
-            indx = np.argmax(indxatcr[0])
-            indxtimemaxm = indxatcr[0][indx]
-            indxparamaxm = indxatcr[1][indx]
-            atcr = atcr[:, indxparamaxm]
-            timeatcr = indxtimemaxm
-   
-    if boolfail:
-        if atcrtype == 'maxm':
-            return np.zeros((1, 1)), 0.
-        else:
-            return np.zeros((1, numbpara)), 0.
-    else:
-        return atcr, timeatcr
+    values = np.asarray(listpara).reshape(len(listpara), -1)
+    correlations, times = autocorrelation_time(values, typeverb=typeverb, atcrtype=atcrtype)
+    if atcrtype == 'nomi':
+        return correlations.T, times
+    if not np.any(np.isfinite(times)):
+        return np.zeros((1, 1)), 0.
+    index = np.nanargmax(times)
+    return correlations[index], float(times[index])
 
 
 def retr_timeunitdays(time):
@@ -5099,134 +5069,25 @@ def retr_lpos(para, *dictlpos):
     return lpos
 
 
-_pcat_callback_cache = {}
-
-
-def _pcat_legacy_llik(gdat, strgmodl, para):
-    import cloudpickle
-
-    payload = gdat.legacy_payload
-    key = id(payload)
-    if key not in _pcat_callback_cache or _pcat_callback_cache[key][0] is not payload:
-        if len(_pcat_callback_cache) >= 8:
-            _pcat_callback_cache.pop(next(iter(_pcat_callback_cache)))
-        _pcat_callback_cache[key] = (payload, cloudpickle.loads(payload))
-    legacy_gdat, legacy_llik, legacy_lpri = _pcat_callback_cache[key][1]
-    llik = legacy_llik(para, legacy_gdat)
-    if legacy_lpri is not None:
-        llik += legacy_lpri(para, legacy_gdat)
-        gaussian = np.asarray(gdat.legacy_scalpara) == 'gaus'
-        llik += 0.5 * np.sum(((para[gaussian] - gdat.legacy_mean[gaussian]) /
-                               gdat.legacy_stdv[gaussian]) ** 2)
-    return llik
-
-
 def _pcat_legacy_chains(gdat, retr_llik, retr_lpri, names, scales, minima, maxima,
                         means, stdvs, initial, numbwalk, numbsampwalk,
                         numbsampburnwalkinit, pathbase, typeverb,
                         estimate_log_evidence=False, evidence_samples=4000, seed=None):
-    from contextlib import nullcontext
-    from tempfile import TemporaryDirectory
-    from uuid import uuid4
-    import cloudpickle
-    from pcat.diagnostics import estimate_evidence
-    from pcat.main import sample
+    from pcat.fixed import sample_fixed_chains
 
-    means = np.zeros(len(names)) if means is None else np.asarray(means)
-    stdvs = np.ones(len(names)) if stdvs is None else np.asarray(stdvs)
-    output = nullcontext(pathbase) if pathbase is not None else TemporaryDirectory(prefix='tdpy-pcat-')
-    with output as root:
-        result = sample(
-            typeexpr='gener', retr_llik=_pcat_legacy_llik,
-            parameter_names=tuple(names),
-            prior_types=tuple('self' if scale == 'logt' else scale for scale in scales),
-            prior_minima=minima, prior_maxima=maxima,
-            prior_means=means, prior_stdvs=stdvs,
-            initial_values=np.mean(initial, axis=0),
-            legacy_payload=cloudpickle.dumps((gdat, retr_llik, retr_lpri)),
-            legacy_scalpara=np.asarray(scales), legacy_mean=np.asarray(means),
-            legacy_stdv=np.asarray(stdvs),
-            numbproc=numbwalk, numbswep=numbsampwalk + numbsampburnwalkinit,
-            numbburn=numbsampburnwalkinit,
-            numbsamp=numbsampwalk, pathbase=root,
-            strgcnfg='tdpy_' + uuid4().hex[:16], typeverb=typeverb,
-        )
-        chain = np.asarray(result.listpostparagenrscalbase).reshape(numbwalk, numbsampwalk, -1)
-        logprob = np.asarray(result.listpostlpostotl).reshape(numbwalk, numbsampwalk)
-        if estimate_log_evidence:
-            if retr_lpri is not None:
-                raise ValueError('Evidence needs a normalized prior; custom legacy priors require a density and sampler.')
-            evidence = estimate_evidence(
-                chain.reshape(-1, len(names)), lambda values: retr_llik(values, gdat),
-                tuple('self' if scale == 'logt' else scale for scale in scales),
-                minima, maxima, means, stdvs, sample_count=evidence_samples, seed=seed,
-            )
-            return chain, logprob, evidence
-    return chain, logprob
-
-
-def _allesfitter_pcat_llik(para, datadir):
-    from allesfitter import config
-    from allesfitter.mcmc import mcmc_lnlike
-
-    if not hasattr(config, 'BASEMENT') or config.BASEMENT.datadir != datadir:
-        config.init(datadir)
-    try:
-        value = float(mcmc_lnlike(para))
-    except Exception:
-        return -np.inf
-    return value if np.isfinite(value) else -np.inf
+    return sample_fixed_chains(
+        gdat, retr_llik, retr_lpri, names, scales, minima, maxima,
+        means, stdvs, initial, numbwalk, numbsampwalk,
+        numbsampburnwalkinit, pathbase, typeverb,
+        estimate_log_evidence, evidence_samples, seed,
+    )
 
 
 def sample_allesfitter_pcat(datadir):
-    """Fit an allesfitter model with PCAT and persist its existing HDF contract."""
-    import h5py
-    from allesfitter import config
+    """Compatibility forwarding for existing tdpy integrations."""
+    from pcat.fixed import sample_allesfitter_pcat as sample_with_pcat
 
-    config.init(datadir)
-    basement = config.BASEMENT
-    bounds = basement.bounds
-    prior_types = []
-    minima = []
-    maxima = []
-    means = []
-    stdvs = []
-    for bound in bounds:
-        if bound[0] == 'uniform':
-            prior_types.append('self')
-            minima.append(bound[1])
-            maxima.append(bound[2])
-            means.append(0.)
-            stdvs.append(1.)
-        elif bound[0] == 'normal':
-            prior_types.append('gaus')
-            means.append(bound[1])
-            stdvs.append(bound[2])
-            minima.append(bound[1] - 10 * bound[2])
-            maxima.append(bound[1] + 10 * bound[2])
-        else:
-            raise ValueError('PCAT requires normalized uniform or normal allesfitter priors.')
-    settings = basement.settings
-    walker_count = int(settings['mcmc_nwalkers'])
-    step_count = int(settings['mcmc_total_steps']) // int(settings['mcmc_thin_by'])
-    chain, logprob = _pcat_legacy_chains(
-        datadir, _allesfitter_pcat_llik, None,
-        ['parameter_%d' % index for index in range(len(bounds))], prior_types,
-        np.asarray(minima), np.asarray(maxima), np.asarray(means), np.asarray(stdvs),
-        np.asarray(basement.theta_0)[None, :], walker_count, step_count,
-        0, datadir, 0,
-    )
-    path = Path(basement.outdir) / 'mcmc_save.h5'
-    path.parent.mkdir(parents=True, exist_ok=True)
-    print('Writing to %s...' % path)
-    with h5py.File(path, 'w') as output:
-        group = output.create_group('mcmc')
-        group.attrs.update(version='pcat-compat', nwalkers=walker_count,
-                           ndim=len(bounds), has_blobs=False, iteration=step_count)
-        group.create_dataset('chain', data=chain.transpose(1, 0, 2), maxshape=(None, walker_count, len(bounds)))
-        group.create_dataset('log_prob', data=logprob.T, maxshape=(None, walker_count))
-        group.create_dataset('accepted', data=np.zeros(walker_count))
-    return path
+    return sample_with_pcat(datadir)
 
 
 def retr_icdfunif(cdfn, minm, maxm):
