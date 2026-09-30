@@ -5162,7 +5162,11 @@ def _allesfitter_pcat_llik(para, datadir):
 
     if not hasattr(config, 'BASEMENT') or config.BASEMENT.datadir != datadir:
         config.init(datadir)
-    return mcmc_lnlike(para)
+    try:
+        value = float(mcmc_lnlike(para))
+    except Exception:
+        return -np.inf
+    return value if np.isfinite(value) else -np.inf
 
 
 def sample_allesfitter_pcat(datadir):

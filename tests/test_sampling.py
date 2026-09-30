@@ -122,6 +122,32 @@ def test_allesfitter_adapter_writes_pcat_chain_for_existing_reader(tmp_path, mon
         assert saved['mcmc'].attrs['iteration'] == 6
 
 
+def test_allesfitter_adapter_runs_pcat_likelihood(tmp_path, monkeypatch):
+    import sys
+    import types
+    import h5py
+
+    config = types.ModuleType('allesfitter.config')
+    config.init = lambda path: setattr(config, 'BASEMENT', types.SimpleNamespace(
+        datadir=path, bounds=[('uniform', 0., 1.)], theta_0=np.array([0.5]),
+        outdir=str(tmp_path / 'results'),
+        settings={'mcmc_nwalkers': 1, 'mcmc_total_steps': 8, 'mcmc_thin_by': 1},
+    ))
+    likelihood = types.ModuleType('allesfitter.mcmc')
+    likelihood.mcmc_lnlike = lambda para: -0.5 * (para[0] - 0.5)**2
+    allesfitter = types.ModuleType('allesfitter')
+    allesfitter.config = config
+    monkeypatch.setitem(sys.modules, 'allesfitter', allesfitter)
+    monkeypatch.setitem(sys.modules, 'allesfitter.config', config)
+    monkeypatch.setitem(sys.modules, 'allesfitter.mcmc', likelihood)
+
+    path = util.sample_allesfitter_pcat(str(tmp_path))
+    print('Reading from %s...' % path)
+    with h5py.File(path, 'r') as saved:
+        assert saved['mcmc/chain'].shape == (8, 1, 1)
+        assert np.all(np.isfinite(saved['mcmc/log_prob'][:]))
+
+
 def test_deprecated_samp_allows_valid_burn_in():
 
     def retr_llik(para, gdat):
