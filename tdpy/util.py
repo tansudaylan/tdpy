@@ -4808,35 +4808,15 @@ def retr_numbsamp(numbswep, numbburn, factthin):
 
 
 def plot_gmrb(path, gmrbstat, typefileplot='pdf', typeplotback='norm'):
+    from pcat.plotting import plot_gelman_rubin
 
-    numbbinsplot = 40
-    bins = np.linspace(1., np.amax(gmrbstat), numbbinsplot + 1)
-    figr, axis = plt.subplots()
-    axis.hist(gmrbstat, bins=bins)
-    axis.set_title('Gelman-Rubin Convergence Test')
-    axis.set_xlabel('PSRF')
-    axis.set_ylabel('$N_p$')
-    pathplot = save_figure(figr, path + 'gmrb', typefileplot, typeplotback)
-    plt.close(figr)
-
-    return pathplot
+    return plot_gelman_rubin(path, gmrbstat, typefileplot, typeplotback)
 
 
 def plot_atcr(path, atcr, timeatcr, strgextn='', typefileplot='pdf', typeplotback='norm'):
+    from pcat.plotting import plot_autocorrelation
 
-    numbsampatcr = atcr.size
-    
-    figr, axis = plt.subplots(figsize=(6, 4))
-    axis.plot(np.arange(numbsampatcr), atcr)
-    axis.set_xlabel(r'$\tau$')
-    axis.set_ylabel(r'$\xi(\tau)$')
-    axis.text(0.8, 0.8, r'$\tau_{exp} = %.3g$' % timeatcr, ha='center', va='center', transform=axis.transAxes)
-    axis.axhline(0., ls='--', alpha=0.5)
-    plt.tight_layout()
-    pathplot = save_figure(figr, path + 'atcr%s' % strgextn, typefileplot, typeplotback)
-    plt.close(figr)
-
-    return pathplot
+    return plot_autocorrelation(path, atcr, timeatcr, strgextn, typefileplot, typeplotback)
         
 def plot_propeffi(path, numbswep, numbpara, listaccp, listindxparamodi, namepara):
 
