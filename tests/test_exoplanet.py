@@ -3,6 +3,7 @@ import pytest
 
 from tdpy.exoplanet import (
     empirical_interval_contrasts,
+    keplerian_radial_velocity,
     kipping_to_quadratic_limb_darkening,
     paired_interval_contrast_forecast,
     plot_atmosphere_spectra,
@@ -11,6 +12,24 @@ from tdpy.exoplanet import (
     quadratic_limb_darkening,
     quadratic_to_kipping_limb_darkening,
 )
+
+
+def test_keplerian_radial_velocity_reduces_to_a_sinusoid_for_circular_orbits():
+    time = np.linspace(0.0, 30.0, 200)  # [day]
+    velocity = keplerian_radial_velocity(time, 7.0, 3.0, 0.0, 0.4, 1.1)
+    expected = 3.0 * np.cos(0.4 + 1.1 + 2.0 * np.pi * time / 7.0)
+    assert velocity == pytest.approx(expected, abs=1e-10)
+
+
+def test_keplerian_radial_velocity_has_zero_time_average_and_broadcasts():
+    time = np.linspace(0.0, 10.0, 20001)[:-1]  # [day]
+    eccentricity = np.array([0.0, 0.3, 0.7])
+    velocity = keplerian_radial_velocity(time[:, None], 10.0, 5.0, eccentricity, 1.0, 0.2)
+    assert velocity.shape == (time.size, 3)
+    assert np.mean(velocity, axis=0) == pytest.approx(np.zeros(3), abs=1e-6)
+    assert np.ptp(velocity, axis=0) == pytest.approx(
+        2.0 * 5.0 * np.ones(3), rel=1e-3
+    )
 
 
 def test_kipping_limb_darkening_transforms_round_trip():

@@ -75,6 +75,43 @@ def quadratic_limb_darkened_stellar_grid(
     return image_x, image_y, radial_distance, stellar_brightness
 
 
+def keplerian_radial_velocity(
+    time: np.ndarray,
+    period: float | np.ndarray,
+    semi_amplitude: float | np.ndarray,
+    eccentricity: float | np.ndarray,
+    argument_periastron: float | np.ndarray,
+    mean_anomaly_reference: float | np.ndarray,
+    time_reference: float = 0.0,
+) -> np.ndarray:
+    """Return the stellar Keplerian radial velocity [m/s].
+
+    Units are time and period [day], semi-amplitude [m/s], and angles [rad].
+    All inputs broadcast, so ``time[:, None]`` with per-planet arrays of
+    shape ``(M,)`` returns one curve per planet with shape ``(N, M)``.
+    """
+
+    eccentricity = np.asarray(eccentricity, dtype=float)
+    mean_anomaly = mean_anomaly_reference + 2.0 * np.pi * (np.asarray(time) - time_reference) / period
+
+    # Newton iterations on Kepler's equation for the eccentric anomaly
+    eccentric_anomaly = mean_anomaly + eccentricity * np.sin(mean_anomaly)
+    for _ in range(100):
+        residual = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly) - mean_anomaly
+        eccentric_anomaly = eccentric_anomaly - residual / (1.0 - eccentricity * np.cos(eccentric_anomaly))
+        if np.all(np.abs(residual) < 1e-12):
+            break
+    else:
+        raise RuntimeError("Kepler solver did not converge.")
+    true_anomaly = 2.0 * np.arctan2(
+        np.sqrt(1.0 + eccentricity) * np.sin(eccentric_anomaly / 2.0),
+        np.sqrt(1.0 - eccentricity) * np.cos(eccentric_anomaly / 2.0),
+    )
+    return semi_amplitude * (
+        np.cos(argument_periastron + true_anomaly) + eccentricity * np.cos(argument_periastron)
+    )
+
+
 def calculate_binned_transmission_spectrum(
     calculator: Any,
     stellar_radius_m: float,
