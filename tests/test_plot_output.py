@@ -40,6 +40,24 @@ def test_save_figure_writes_styled_plot(tmp_path, capsys, typefileplot, typeplot
     plt.close(figure)
 
 
+def test_write_animation_pads_frames_and_shares_one_palette(tmp_path):
+    from PIL import Image
+
+    frames = []
+    for index, size in enumerate(((3.0, 2.0), (3.5, 2.0))):
+        figure, axis = plt.subplots(figsize=size, dpi=40)
+        axis.imshow(np.arange(16.0).reshape(4, 4) * (index + 1), cmap='magma')
+        frames.append(tdpy.figure_to_frame(figure))
+    path = tdpy.write_animation(frames, tmp_path / 'movie.png', duration_ms=50)
+
+    assert path == tmp_path / 'movie.gif'
+    with Image.open(path) as animation:
+        assert animation.n_frames == 2
+        assert animation.size == (max(f.width for f in frames), max(f.height for f in frames))
+    with pytest.raises(ValueError):
+        tdpy.write_animation([], tmp_path / 'empty.gif')
+
+
 def test_save_current_figure_uses_active_figure(tmp_path):
     figure, axis = plt.subplots()
     axis.plot([0.0, 1.0], [1.0, 0.0])

@@ -14,10 +14,9 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 import tesswcs
 
-from .plotting import plot_background_colors, save_figure
+from .plotting import figure_to_frame, plot_background_colors, save_figure, write_animation
 
 
 DETECTOR_SHAPE = (2048, 2048)
@@ -96,13 +95,18 @@ def tess_sector_footprints(
     return tuple(footprints)
 
 
-def target_is_visible(
+def locate_tess_target(
     sector: int,
     right_ascension_deg: float,
     declination_deg: float,
     detector_shape=DETECTOR_SHAPE,
-) -> bool:
-    """Return whether an ICRS coordinate falls on any CCD in a TESS sector."""
+) -> tuple[int, int, float, float] | None:
+    """Return (camera, CCD, column, row) of an ICRS coordinate in a TESS sector, or None if off-detector.
+
+    The pixel position is on the 2048 by 2048 science area of the predicted
+    pointing, so it locates the CCD reliably; use the FFI's own header WCS for
+    precise pixel positions.
+    """
     sector = _validate_sector(sector)
     width, height = detector_shape
     coordinate = SkyCoord(right_ascension_deg * u.deg, declination_deg * u.deg, frame="icrs")
@@ -126,8 +130,18 @@ def target_is_visible(
                 and 0.0 <= x_pixel <= width
                 and 0.0 <= y_pixel <= height
             ):
-                return True
-    return False
+                return camera, ccd, float(x_pixel), float(y_pixel)
+    return None
+
+
+def target_is_visible(
+    sector: int,
+    right_ascension_deg: float,
+    declination_deg: float,
+    detector_shape=DETECTOR_SHAPE,
+) -> bool:
+    """Return whether an ICRS coordinate falls on any CCD in a TESS sector."""
+    return locate_tess_target(sector, right_ascension_deg, declination_deg, detector_shape) is not None
 
 
 def tess_target_visibility(
@@ -315,28 +329,15 @@ def animate_tess_sectors(
         _draw_sector_map(axis, (sector,), targets, typeplotback)
         axis.set_title(f"TESS Sector {sector}")
         figure.tight_layout()
-        figure.canvas.draw()
-        frames.append(Image.fromarray(np.asarray(figure.canvas.buffer_rgba())).convert("RGB"))
-        plt.close(figure)
-
-    output_path = Path(output_path).with_suffix(".gif")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Writing to {output_path}...")
-    frames[0].save(
-        output_path,
-        save_all=True,
-        append_images=frames[1:],
-        duration=duration_ms,
-        loop=0,
-        disposal=2,
-    )
-    return output_path
+        frames.append(figure_to_frame(figure))
+    return write_animation(frames, output_path, duration_ms=duration_ms)
 
 
 __all__ = [
     "DETECTOR_SHAPE",
     "TessCcdFootprint",
     "animate_tess_sectors",
+    "locate_tess_target",
     "plot_tess_sector_map",
     "plot_tess_sector_sequence",
     "plot_tess_visibility",

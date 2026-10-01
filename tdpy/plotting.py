@@ -5,6 +5,7 @@ from pathlib import Path
 from tdpy.verbosity import print
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def plot_file_path(path, typefileplot="png"):
@@ -72,10 +73,57 @@ def save_current_figure(path, typefileplot="png", typeplotback="norm", **kwargs)
     return save_figure(plt.gcf(), path, typefileplot, typeplotback, **kwargs)
 
 
+def figure_to_frame(figure, close_figure=True):
+    """Render a Matplotlib figure into an RGB PIL image for an animation frame."""
+    from PIL import Image
+
+    figure.canvas.draw()
+    frame = Image.fromarray(np.asarray(figure.canvas.buffer_rgba())).convert("RGB")
+    if close_figure:
+        plt.close(figure)
+    return frame
+
+
+def write_animation(frames, path, duration_ms=200, loop=0):
+    """Write RGB frames to an animated GIF with one shared palette and return its path.
+
+    Frames of different sizes are padded with white to the largest size, and one adaptive
+    palette built from all frames keeps colors identical from frame to frame.
+    """
+    from PIL import Image
+
+    frames = [frame.convert("RGB") for frame in frames]
+    if not frames:
+        raise ValueError("write_animation needs at least one frame")
+    if duration_ms < 1:
+        raise ValueError("duration_ms must be positive")
+    width = max(frame.width for frame in frames)
+    height = max(frame.height for frame in frames)
+    padded = []
+    for frame in frames:
+        canvas = Image.new("RGB", (width, height), "white")
+        canvas.paste(frame, (0, 0))
+        padded.append(canvas)
+    # one palette from a strip of every frame avoids flicker between frames
+    strip = Image.new("RGB", (width, height * len(padded)))
+    for index, frame in enumerate(padded):
+        strip.paste(frame, (0, index * height))
+    palette = strip.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
+    quantized = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in padded]
+    path = Path(path).with_suffix(".gif")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Writing to {path}...")
+    quantized[0].save(path, save_all=True, append_images=quantized[1:], duration=duration_ms,
+                      loop=loop, disposal=2, optimize=False)
+    return path
+
+
 __all__ = [
+    "figure_to_frame",
     "normalize_plot_background",
     "plot_background_colors",
     "plot_file_path",
     "save_current_figure",
     "save_figure",
+    "write_animation",
 ]
