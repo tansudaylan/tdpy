@@ -1,7 +1,7 @@
 import pytest
 import tdpy
 
-from tdpy.cli import parse_plot_arguments
+from tdpy.cli import add_plot_arguments, parse_plot_arguments
 
 
 def test_parse_plot_arguments_defaults_to_png():
@@ -15,6 +15,17 @@ def test_parse_plot_arguments_accepts_pdf():
 def test_parse_plot_arguments_rejects_other_formats():
     with pytest.raises(SystemExit):
         parse_plot_arguments(arguments=["--typefileplot", "svg"])
+
+
+def test_add_plot_arguments_composes_with_existing_options():
+    import argparse
+
+    parser = add_plot_arguments(argparse.ArgumentParser())
+    parser.add_argument("--quick", action="store_true")
+    arguments = parser.parse_args(["--typefileplot", "pdf", "--quick"])
+
+    assert arguments.typefileplot == "pdf"
+    assert arguments.quick is True
 
 
 def test_dispatch_cli_forwards_arguments():
