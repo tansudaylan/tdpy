@@ -20,6 +20,11 @@ def test_print_to_an_explicit_file_is_never_suppressed(monkeypatch):
     assert verbosity.tqdm(range(3)).disable
 
 
+def test_tqdm_cannot_enable_console_output_when_verbosity_is_off(monkeypatch):
+    monkeypatch.setenv('TDPY_VERBOSITY', '0')
+    assert verbosity.tqdm(range(3), disable=False).disable
+
+
 def test_verbosity_requires_a_positive_integer(monkeypatch):
     for value, expected in (
         ('1', True),

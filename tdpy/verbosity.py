@@ -45,5 +45,6 @@ def tqdm(*args, **kwargs):
     """Progress bar that is disabled unless TDPY_VERBOSITY is positive."""
     from tqdm import tqdm as tqdmbase
 
-    kwargs.setdefault('disable', not retr_boolverb())
+    if not retr_boolverb():
+        kwargs['disable'] = True
     return tqdmbase(*args, **kwargs)
