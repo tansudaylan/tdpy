@@ -1,4 +1,5 @@
 import io
+import logging
 
 import tdpy.verbosity as verbosity
 
@@ -23,6 +24,21 @@ def test_print_to_an_explicit_file_is_never_suppressed(monkeypatch):
 def test_tqdm_cannot_enable_console_output_when_verbosity_is_off(monkeypatch):
     monkeypatch.setenv('TDPY_VERBOSITY', '0')
     assert verbosity.tqdm(range(3), disable=False).disable
+
+
+def test_console_logging_and_context_managed_progress_follow_verbosity(capsys, monkeypatch):
+    handler = verbosity.VerbosityStreamHandler()
+    record = logging.makeLogRecord({'msg': 'pipeline message', 'levelno': logging.INFO})
+
+    monkeypatch.setenv('TDPY_VERBOSITY', '0')
+    handler.emit(record)
+    with verbosity.tqdm(total=1) as progress:
+        progress.update(1)
+    assert capsys.readouterr().err == ''
+
+    monkeypatch.setenv('TDPY_VERBOSITY', '1')
+    handler.emit(record)
+    assert capsys.readouterr().err == 'pipeline message\n'
 
 
 def test_verbosity_requires_a_positive_integer(monkeypatch):

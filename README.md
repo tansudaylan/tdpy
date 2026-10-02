@@ -84,6 +84,16 @@ PCAT is the sole posterior sampler in this software ecosystem. Use:
 
 TDpy does not expose `tdpy.mcmc`, `tdpy.samp`, or posterior-sampling compatibility wrappers. This keeps the dependency direction one-way because PCAT depends on TDpy for numerical utilities.
 
+## Nightly and annual target visibility
+
+`tdpy.astro.run_target_visibility_diagnostic()` computes a target's altitude and the Sun's altitude through one night, then samples the target's maximum altitude during darkness across a year. The output plot and arrays work for any observatory latitude, longitude, height, and target coordinates. The maintained [TOI-1233 example](examples/target_visibility/TargetVisibility.ipynb) uses the TUBITAK National Observatory and needs no network access. From the TDpy repository root, run:
+
+```bash
+python examples/target_visibility/run.py --target TOI-1233 --observatory TUG
+```
+
+![Nightly and annual visibility of TOI-1233 from TUG](examples/target_visibility/visuals/target_visibility_toi-1233.png)
+
 ## TESS sky coverage and visibility
 
 `tdpy.tess` converts the Transiting Exoplanet Survey Satellite (TESS) mission pointing and detector World Coordinate Systems from `tesswcs` into reusable sky products. It provides:
@@ -94,7 +104,7 @@ TDpy does not expose `tdpy.mcmc`, `tdpy.samp`, or posterior-sampling compatibili
 - `plot_tess_visibility()` for target-by-sector coverage matrices; and
 - `animate_tess_sectors()` for fixed-frame full-sky GIFs over time.
 
-Run the maintained example with:
+Run the maintained example to draw quick static maps of Sectors 1--4 and a dated animation of all standard sectors 1--134:
 
 ```bash
 python examples/tess_visibility/tess_visibility.py --sectors 1 2 3 4
@@ -106,9 +116,13 @@ python examples/tess_visibility/tess_visibility.py --sectors 1 2 3 4
 
 ![TESS sector sequence across the full sky](examples/tess_visibility/visuals/tess_sector_sequence.gif)
 
-The inputs are integer sector numbers and optional named International Celestial Reference System coordinates in degrees. The example marks the real catalog positions of Beta Pictoris, TOI-700, and the Large Magellanic Cloud. These coordinates illustrate visibility and do not represent new observations. Each target is transformed through all 16 sector CCD World Coordinate Systems and is visible only when its pixel coordinate falls on silicon.
+![TOI alert dates accumulating across TESS sectors, with TOI-1233 highlighted](examples/tess_visibility/visuals/tess_sector_sequence_tois.gif)
 
-Static figures are written directly under `examples/tess_visibility/visuals/`. The example also writes one map per sector. Runtime and memory scale linearly with the number of sectors and targets. Four sectors with three targets complete in several seconds on a laptop. The footprint boundary follows the nominal detector geometry in `tesswcs`; it does not model scattered light, data-quality masks, cadence availability, or target-specific postage-stamp allocation.
+The inputs are integer sector numbers and optional named International Celestial Reference System coordinates in degrees. The example highlights the real position of TOI-1233 and also marks Beta Pictoris and the Large Magellanic Cloud. Dates for Sectors 1--121 come from the `tesswcs` pointing table; the provisional dates and pointings for Sectors 122--134 come from [NASA's TESS observing schedule](https://heasarc.gsfc.nasa.gov/docs/tess/sector.html), recorded on October 1, 2026. `tesswcs` predicts camera geometry for future sectors from those published pointings. Frames distinguish past, in-progress, and planned sectors as of the rendering date. These markers illustrate sky coverage and do not represent new observations. Each target is transformed through all 16 sector CCD World Coordinate Systems and is visible only when its pixel coordinate falls on silicon.
+
+The second animation shows the 8,148 TOI candidates in the [ExoFOP TESS TOI table](https://exofop.ipac.caltech.edu/tess/view_toi.php), using its **Date TOI Alerted (UTC)** and sky-position columns as downloaded on October 1, 2026. Each candidate first appears in the sector frame whose end date reaches its alert date; multiple candidates around one star overlap at the same sky position. TOI-1233 receives a separate red marker beginning with its 2019-08-26 alert. Future frames retain the TOIs already alerted as of the render date and do not imply future discoveries. The compact [TOI snapshot](examples/tess_visibility/toi_alerts.csv) makes offline reruns reproducible; `--refresh-tois` explicitly downloads an updated ExoFOP table.
+
+Static figures are written directly under `examples/tess_visibility/visuals/`. The example also writes one map per requested static-map sector. Runtime and memory scale with the number of animated sectors; use `--animation-sectors 1 2 3 4` for a short development run. The footprint boundary follows nominal detector geometry in `tesswcs`; future pointings remain provisional, and the maps do not model scattered light, data-quality masks, cadence availability, or target-specific postage-stamp allocation.
 
 ## Data paths
 

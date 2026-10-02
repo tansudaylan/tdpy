@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Mapping
@@ -12,6 +13,7 @@ from tdpy.verbosity import print
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 import matplotlib.pyplot as plt
 import numpy as np
 import tesswcs
@@ -20,6 +22,23 @@ from .plotting import figure_to_frame, plot_background_colors, save_figure, writ
 
 
 DETECTOR_SHAPE = (2048, 2048)
+# Provisional sectors beyond tesswcs's packaged table, from NASA's TESS sector
+# schedule: https://heasarc.gsfc.nasa.gov/docs/tess/sector.html (2026-10-01).
+PLANNED_SECTORS = {
+    122: ('2027-09-19', '2027-10-17', 282.65, 66.88, 87.81),
+    123: ('2027-10-17', '2027-11-15', 281.25, 69.25, 117.08),
+    124: ('2027-11-15', '2027-12-14', 276.07, 71.06, 151.14),
+    125: ('2027-12-14', '2028-01-11', 268.28, 71.53, 187.86),
+    126: ('2028-01-11', '2028-02-07', 261.50, 70.49, 222.43),
+    127: ('2028-02-07', '2028-03-04', 257.95, 68.55, 252.29),
+    128: ('2028-03-04', '2028-03-30', 257.48, 66.33, 278.36),
+    129: ('2028-03-30', '2028-04-25', 259.32, 64.26, 302.21),
+    130: ('2028-04-25', '2028-05-22', 241.73, 34.57, 341.30),
+    131: ('2028-05-22', '2028-06-19', 259.74, 31.10, 353.07),
+    132: ('2028-06-19', '2028-07-18', 278.24, 30.91, 5.56),
+    133: ('2028-07-18', '2028-08-16', 236.48, -18.90, 76.99),
+    134: ('2028-08-16', '2028-09-13', 314.21, -16.82, 105.19),
+}
 
 
 @dataclass(frozen=True)
@@ -31,6 +50,16 @@ class TessCcdFootprint:
     ccd: int
     right_ascension_deg: np.ndarray
     declination_deg: np.ndarray
+
+
+@dataclass(frozen=True)
+class TessToiAlert:
+    """A public TOI candidate's position and ExoFOP alert date (UTC)."""
+
+    toi: str
+    right_ascension_deg: float
+    declination_deg: float
+    alerted_on: date
 
 
 def _validate_sector(sector: int) -> int:
@@ -49,9 +78,33 @@ def _normalize_sectors(sectors) -> tuple[int, ...]:
     return sectors
 
 
+def tess_sector_dates(sector: int) -> tuple[str, str]:
+    """Return the published UTC start and end dates of a TESS sector."""
+
+    sector = _validate_sector(sector)
+    rows = tesswcs.pointings[tesswcs.pointings['Sector'] == sector]
+    if not len(rows):
+        if sector in PLANNED_SECTORS:
+            return PLANNED_SECTORS[sector][:2]
+        raise ValueError(f'No published dates for TESS sector {sector}')
+    row = rows[0]
+    return tuple(Time(float(row[column]), format='jd').to_datetime().date().isoformat()
+                 for column in ('Start', 'End'))
+
+
 @lru_cache(maxsize=None)
 def _get_wcs(sector: int, camera: int, ccd: int):
-    return tesswcs.WCS.from_sector(sector=sector, camera=camera, ccd=ccd)
+    if sector in tesswcs.WCS.wcs_dicts:
+        return tesswcs.WCS.from_sector(sector=sector, camera=camera, ccd=ccd)
+    rows = tesswcs.pointings[tesswcs.pointings['Sector'] == sector]
+    if len(rows):
+        row = rows[0]
+        return tesswcs.WCS.predict(ra=float(row['RA']), dec=float(row['Dec']),
+                                    roll=float(row['Roll']), camera=camera, ccd=ccd)
+    if sector in PLANNED_SECTORS:
+        _, _, ra, dec, roll = PLANNED_SECTORS[sector]
+        return tesswcs.WCS.predict(ra=ra, dec=dec, roll=roll, camera=camera, ccd=ccd)
+    raise ValueError(f'No published pointing for TESS sector {sector}')
 
 
 def _detector_boundary(detector_shape, samples_per_edge):
@@ -178,7 +231,7 @@ def _split_wrapped_path(longitude, latitude):
     return zip(np.split(longitude, split_indices), np.split(latitude, split_indices))
 
 
-def _draw_sector_map(axis, sectors, targets, typeplotback):
+def _draw_sector_map(axis, sectors, targets, typeplotback, highlighted_targets=()):
     background, foreground = plot_background_colors(typeplotback)
     colors = plt.get_cmap("viridis")(np.linspace(0.12, 0.88, len(sectors)))
     for sector, color in zip(sectors, colors):
@@ -200,12 +253,13 @@ def _draw_sector_map(axis, sectors, targets, typeplotback):
     visibility = tess_target_visibility(targets, sectors) if targets else {}
     for name, (right_ascension_deg, declination_deg) in targets.items():
         visible = visibility[name]
+        highlighted = name in highlighted_targets
         axis.scatter(
             _mollweide_longitude(right_ascension_deg),
             np.deg2rad(declination_deg),
             marker="*",
-            s=65,
-            color="#A51417" if visible else "0.55",
+            s=100 if highlighted else 65,
+            color="#A51417" if highlighted or visible else "0.55",
             edgecolor=foreground,
             linewidth=0.5,
             zorder=4,
@@ -218,6 +272,7 @@ def _draw_sector_map(axis, sectors, targets, typeplotback):
             textcoords="offset points",
             color=foreground,
             fontsize=8,
+            fontweight='bold' if highlighted else 'normal',
         )
 
     tick_degrees = np.arange(-150, 181, 30)
@@ -315,19 +370,52 @@ def animate_tess_sectors(
     targets: Mapping[str, tuple[float, float]] | None = None,
     duration_ms: int = 500,
     typeplotback: str = "white",
+    highlighted_targets=(),
+    as_of: date | None = None,
+    toi_alerts: tuple[TessToiAlert, ...] | None = None,
+    highlighted_toi: str | None = None,
 ) -> Path:
-    """Write a full-sky GIF with one frame per TESS sector."""
+    """Write dated sector frames, optionally accumulating publicly alerted TOIs."""
     sectors = _normalize_sectors(sectors)
     if duration_ms < 1:
         raise ValueError("duration_ms must be positive")
     targets = {} if targets is None else dict(targets)
+    toi_alerts = None if toi_alerts is None else tuple(toi_alerts)
+    as_of = date.today() if as_of is None else as_of
     background, _ = plot_background_colors(typeplotback)
     frames = []
     for sector in sectors:
-        figure = plt.figure(figsize=(9.6, 5.4), facecolor=background)
+        figure = plt.figure(figsize=(9.6, 5.4), dpi=100, facecolor=background)
         axis = figure.add_subplot(111, projection="mollweide")
-        _draw_sector_map(axis, (sector,), targets, typeplotback)
-        axis.set_title(f"TESS Sector {sector}")
+        _draw_sector_map(axis, (sector,), targets, typeplotback, highlighted_targets)
+        start, end = tess_sector_dates(sector)
+        if toi_alerts is not None:
+            alerted = [alert for alert in toi_alerts if alert.alerted_on <= min(as_of, date.fromisoformat(end))]
+            ordinary = [alert for alert in alerted if alert.toi.split('.')[0] != highlighted_toi]
+            if ordinary:
+                axis.scatter(
+                    _mollweide_longitude([alert.right_ascension_deg for alert in ordinary]),
+                    np.deg2rad([alert.declination_deg for alert in ordinary]),
+                    s=2.0, alpha=0.5, color='#267e77', linewidths=0, zorder=3,
+                )
+            highlighted = next((alert for alert in alerted if alert.toi.split('.')[0] == highlighted_toi), None)
+            if highlighted is not None:
+                position = (_mollweide_longitude(highlighted.right_ascension_deg),
+                            np.deg2rad(highlighted.declination_deg))
+                axis.scatter(*position, s=120, marker='*', color='#A51417',
+                             edgecolor='black', linewidth=0.6, zorder=5)
+                axis.annotate(f'TOI-{highlighted_toi}', position, xytext=(-6, 8),
+                              textcoords='offset points', ha='right', fontweight='bold', fontsize=8)
+            axis.text(0.5, 0.93, f'{len(alerted):,} alerted TOIs', transform=axis.transAxes,
+                      ha='center', va='top', fontsize=9,
+                      bbox=dict(facecolor=background, edgecolor='none', alpha=0.9))
+        if as_of.isoformat() < start:
+            status = 'Planned'
+        elif as_of.isoformat() < end:
+            status = 'In progress'
+        else:
+            status = 'Past'
+        axis.set_title(f'TESS Sector {sector} | {start} to {end} ({status})')
         figure.tight_layout()
         frames.append(figure_to_frame(figure))
     return write_animation(frames, output_path, duration_ms=duration_ms)
@@ -336,6 +424,7 @@ def animate_tess_sectors(
 __all__ = [
     "DETECTOR_SHAPE",
     "TessCcdFootprint",
+    "TessToiAlert",
     "animate_tess_sectors",
     "locate_tess_target",
     "plot_tess_sector_map",
@@ -343,5 +432,6 @@ __all__ = [
     "plot_tess_visibility",
     "target_is_visible",
     "tess_sector_footprints",
+    "tess_sector_dates",
     "tess_target_visibility",
 ]

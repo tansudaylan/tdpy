@@ -11,6 +11,15 @@ def test_plot_file_path_replaces_extension(tmp_path):
     assert path == str(tmp_path / 'figure.pdf')
 
 
+def test_sign_code_renders_plain_text_without_latex():
+    figure, axis = plt.subplots()
+    tdpy.sign_code(axis, 'miletos')
+
+    assert axis.texts[-1].get_text() == 'github.com/tansudaylan/miletos'
+    assert axis.texts[-1].get_fontweight() == 'bold'
+    plt.close(figure)
+
+
 @pytest.mark.parametrize(('typeplotback', 'colors'), [
     ('norm', ('white', 'black')),
     ('white', ('white', 'black')),

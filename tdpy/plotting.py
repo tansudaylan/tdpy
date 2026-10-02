@@ -92,21 +92,26 @@ def write_animation(frames, path, duration_ms=200, loop=0):
     """
     from PIL import Image
 
-    frames = [frame.convert("RGB") for frame in frames]
+    frames = [frame if frame.mode == "RGB" else frame.convert("RGB") for frame in frames]
     if not frames:
         raise ValueError("write_animation needs at least one frame")
     if duration_ms < 1:
         raise ValueError("duration_ms must be positive")
     width = max(frame.width for frame in frames)
     height = max(frame.height for frame in frames)
-    padded = []
-    for frame in frames:
-        canvas = Image.new("RGB", (width, height), "white")
-        canvas.paste(frame, (0, 0))
-        padded.append(canvas)
-    # one palette from a strip of every frame avoids flicker between frames
-    strip = Image.new("RGB", (width, height * len(padded)))
-    for index, frame in enumerate(padded):
+    if all(frame.size == (width, height) for frame in frames):
+        padded = frames
+    else:
+        padded = []
+        for frame in frames:
+            canvas = Image.new("RGB", (width, height), "white")
+            canvas.paste(frame, (0, 0))
+            padded.append(canvas)
+    # sample the shared palette from across the sequence without building an
+    # enormous strip for a long animation
+    palette_frames = [padded[index] for index in np.unique(np.linspace(0, len(padded) - 1, min(len(padded), 8)).astype(int))]
+    strip = Image.new("RGB", (width, height * len(palette_frames)))
+    for index, frame in enumerate(palette_frames):
         strip.paste(frame, (0, index * height))
     palette = strip.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
     quantized = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in padded]

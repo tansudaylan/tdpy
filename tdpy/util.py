@@ -1623,8 +1623,8 @@ def sign_code(axis, typesigncode, typeplotback='white'):
         facecolor = typeplotback
 
     bbox = dict(boxstyle='round', edgecolor=edgecolor, facecolor=facecolor)
-    axis.text(0.97, 0.05, r'github.com/tansudaylan/\textbf{%s}' % (typesigncode), bbox=bbox, \
-                                                                        transform=axis.transAxes, color='firebrick', ha='right', size='small')
+    axis.text(0.97, 0.05, 'github.com/tansudaylan/%s' % typesigncode, bbox=bbox, \
+                                         transform=axis.transAxes, color='firebrick', ha='right', size='small', fontweight='bold')
 
 
 def retr_listlablscalpara(listnamepara, listlablpara=None, listlablunitforc=None, dictdefa=None, booldiag=True, typelang='English', boolmath=False, strgelem='comp'):

@@ -6,13 +6,14 @@ Modules opt in with ``from tdpy.verbosity import print``, which shadows the buil
 """
 
 import builtins
+import logging
 import os
 import sys
 import warnings
 
 # packages whose own numerical and plotting warnings are silenced together with their printing
-LISTNAMEPACK = ['abydos', 'aspendos', 'assos', 'chalcedon', 'ephesos', 'gordion', 'hattusa', 'lygos', 'miletos',
-                'nicomedia', 'pcat', 'pergamon', 'sardis', 'tdpy', 'termessos', 'troia']
+LISTNAMEPACK = ['abydos', 'aspendos', 'assos', 'chalcedon', 'darkinferno', 'ephesos', 'gordion', 'hattusa', 'lygos',
+                'mejiro', 'miletos', 'nicomedia', 'pcat', 'pergamon', 'sardis', 'tdpy', 'termessos', 'troia']
 
 
 def retr_boolverb():
@@ -39,6 +40,17 @@ def print(*args, **kwargs):
     file = kwargs.get('file')
     if (file is not None and file is not sys.stdout and file is not sys.stderr) or retr_boolverb():
         builtins.print(*args, **kwargs)
+
+
+class VerbosityStreamHandler(logging.StreamHandler):
+    """Send console logging through the same switch as print."""
+
+    def emit(self, record):
+        try:
+            print(self.format(record), file=self.stream)
+            self.flush()
+        except Exception:
+            self.handleError(record)
 
 
 def tqdm(*args, **kwargs):

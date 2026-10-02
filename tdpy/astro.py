@@ -3,6 +3,7 @@
 from tdpy.verbosity import print
 
 from datetime import datetime
+from dataclasses import dataclass
 from collections.abc import Mapping
 import csv
 import io
@@ -13,6 +14,159 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 import numpy as np
+import astropy.units as u
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_sun
+from astropy.time import Time
+from astropy.utils import iers
+
+from .plotting import save_figure
+
+
+@dataclass(frozen=True)
+class VisibilityDiagnostic:
+    """Nightly and annual visibility of a target from one observatory."""
+
+    hours_from_midnight: np.ndarray
+    nightly_altitude_degrees: np.ndarray
+    nightly_sun_altitude_degrees: np.ndarray
+    days_from_year_start: np.ndarray
+    annual_max_altitude_degrees: np.ndarray
+
+
+def analyze_target_visibility(
+    right_ascension_degrees: float,
+    declination_degrees: float,
+    latitude_degrees: float,
+    longitude_degrees: float,
+    height_meters: float,
+    utc_offset_hours: float,
+    night: str,
+    year_start: str,
+) -> VisibilityDiagnostic:
+    """Calculate target altitude through one night and across one year."""
+
+    iers.conf.auto_download = False
+    target = SkyCoord(right_ascension_degrees * u.deg, declination_degrees * u.deg)
+    location = EarthLocation.from_geodetic(
+        longitude_degrees * u.deg,
+        latitude_degrees * u.deg,
+        height_meters * u.m,
+    )
+    hours_from_midnight = np.linspace(-8.0, 8.0, 193)  # [hour]
+    nightly_times = Time(night) + (hours_from_midnight - utc_offset_hours) * u.hour
+    nightly_frame = AltAz(obstime=nightly_times, location=location)
+    nightly_altitude_degrees = target.transform_to(nightly_frame).alt.deg
+    nightly_sun_altitude_degrees = get_sun(nightly_times).transform_to(nightly_frame).alt.deg
+
+    days_from_year_start = np.arange(0.0, 366.0, 7.0)  # [day]
+    annual_max_altitude_degrees = np.empty(days_from_year_start.size)  # [deg]
+    sample_hours = np.linspace(-8.0, 8.0, 97)  # [hour]
+    for index, day in enumerate(days_from_year_start):
+        sample_times = (
+            Time(year_start)
+            + day * u.day
+            + (sample_hours - utc_offset_hours) * u.hour
+        )
+        sample_frame = AltAz(obstime=sample_times, location=location)
+        altitude_degrees = target.transform_to(sample_frame).alt.deg
+        sun_altitude_degrees = get_sun(sample_times).transform_to(sample_frame).alt.deg
+        dark = sun_altitude_degrees < -12.0
+        annual_max_altitude_degrees[index] = (
+            np.max(altitude_degrees[dark]) if np.any(dark) else np.nan
+        )
+
+    return VisibilityDiagnostic(
+        hours_from_midnight=hours_from_midnight,
+        nightly_altitude_degrees=nightly_altitude_degrees,
+        nightly_sun_altitude_degrees=nightly_sun_altitude_degrees,
+        days_from_year_start=days_from_year_start,
+        annual_max_altitude_degrees=annual_max_altitude_degrees,
+    )
+
+
+def plot_target_visibility(
+    result: VisibilityDiagnostic,
+    output_path: Path,
+    target_label: str,
+    observatory_label: str,
+) -> Path:
+    """Plot nightly altitude and annual dark-time visibility."""
+
+    import matplotlib.pyplot as plt
+
+    output_path = Path(output_path)
+    if output_path.suffix not in {'.png', '.pdf'}:
+        raise ValueError('output_path must end in .png or .pdf')
+
+    figure, axes = plt.subplots(2, 1, figsize=(8.0, 6.8), constrained_layout=True)
+    axes[0].plot(
+        result.hours_from_midnight,
+        result.nightly_altitude_degrees,
+        color='#176B87',
+        linewidth=2.2,
+        label=target_label,
+    )
+    axes[0].fill_between(
+        result.hours_from_midnight,
+        0.0,
+        90.0,
+        where=result.nightly_sun_altitude_degrees < -12.0,
+        color='#DDE7EA',
+        label='Astronomical target window',
+    )
+    axes[0].set_xlabel('Time from local midnight [hour]')
+    axes[0].set_ylabel('Altitude [deg]')
+    axes[0].set_ylim(0.0, 90.0)
+    axes[0].set_title(f'Nightly visibility from {observatory_label}')
+
+    axes[1].plot(
+        result.days_from_year_start,
+        result.annual_max_altitude_degrees,
+        color='#C23B22',
+        linewidth=2.2,
+        label='Maximum during darkness',
+    )
+    axes[1].set_xlabel('Time from year start [day]')
+    axes[1].set_ylabel('Maximum altitude [deg]')
+    axes[1].set_ylim(0.0, 90.0)
+    axes[1].set_title('Annual observing accessibility')
+
+    for axis in axes:
+        axis.grid(False)
+        axis.spines['top'].set_visible(False)
+        axis.spines['right'].set_visible(False)
+        axis.legend(frameon=True, fancybox=True, framealpha=1.0)
+
+    return Path(save_figure(figure, output_path, output_path.suffix.lstrip('.'), close_figure=True))
+
+
+def run_target_visibility_diagnostic(
+    output_path: Path,
+    target_label: str,
+    observatory_label: str,
+    right_ascension_degrees: float,
+    declination_degrees: float,
+    latitude_degrees: float,
+    longitude_degrees: float,
+    height_meters: float,
+    utc_offset_hours: float,
+    night: str,
+    year_start: str,
+) -> VisibilityDiagnostic:
+    """Calculate and plot deterministic target visibility."""
+
+    result = analyze_target_visibility(
+        right_ascension_degrees,
+        declination_degrees,
+        latitude_degrees,
+        longitude_degrees,
+        height_meters,
+        utc_offset_hours,
+        night,
+        year_start,
+    )
+    plot_target_visibility(result, output_path, target_label, observatory_label)
+    return result
 
 
 def read_tap_csv_rows(

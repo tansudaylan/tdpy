@@ -1,8 +1,14 @@
 from datetime import datetime, timezone
+import json
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
 from tdpy.astro import (
+    analyze_target_visibility,
+    run_target_visibility_diagnostic,
     build_periodic_event_report,
     build_transiting_planet_pairs,
     centered_event_start_phase_range,
@@ -14,6 +20,65 @@ from tdpy.astro import (
     select_transiting_planet_pair_comparisons,
     transmission_spectroscopy_metric,
 )
+
+
+def test_target_visibility_samples_night_and_annual_darkness():
+    result = analyze_target_visibility(
+        right_ascension_degrees=186.574,  # [deg]
+        declination_degrees=-51.363,  # [deg]
+        latitude_degrees=36.824166,  # [deg]
+        longitude_degrees=30.335555,  # [deg]
+        height_meters=2500.0,  # [m]
+        utc_offset_hours=3.0,  # [hour]
+        night='2022-07-13 00:00:00',
+        year_start='2022-01-01 00:00:00',
+    )
+
+    assert result.hours_from_midnight.size == 193
+    assert result.days_from_year_start.size == 53
+    assert (result.nightly_sun_altitude_degrees < -12.0).any()
+    assert (result.annual_max_altitude_degrees > 0.0).any()
+
+
+@pytest.mark.parametrize('format_name', ['png', 'pdf'])
+def test_target_visibility_writes_figure(tmp_path, format_name):
+    output_path = tmp_path / f'visibility.{format_name}'
+    result = run_target_visibility_diagnostic(
+        output_path=output_path,
+        target_label='TOI-1233',
+        observatory_label='TUG',
+        right_ascension_degrees=186.574,  # [deg]
+        declination_degrees=-51.363,  # [deg]
+        latitude_degrees=36.824166,  # [deg]
+        longitude_degrees=30.335555,  # [deg]
+        height_meters=2500.0,  # [m]
+        utc_offset_hours=3.0,  # [hour]
+        night='2022-07-13 00:00:00',
+        year_start='2022-01-01 00:00:00',
+    )
+
+    assert result.days_from_year_start.size == 53
+    assert output_path.is_file()
+    assert output_path.stat().st_size > 1000
+
+
+def test_visibility_example_uses_tdpy_without_miletos():
+    repository_path = Path(__file__).resolve().parents[1]
+    script = repository_path / 'examples' / 'target_visibility' / 'run.py'
+    notebook_path = script.with_name('TargetVisibility.ipynb')
+    completed = subprocess.run(
+        [sys.executable, str(script), '--help'],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert '--observatory' in completed.stdout
+    print(f'Reading from {notebook_path}...')
+    notebook = json.loads(notebook_path.read_text())
+    sources = ''.join(''.join(cell['source']) for cell in notebook['cells'])
+    assert 'from tdpy.astro import run_target_visibility_diagnostic' in sources
+    assert 'miletos' not in sources.lower()
 
 
 def test_datetime_to_julian_date_converts_unix_epoch():
