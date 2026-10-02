@@ -56,12 +56,20 @@ def make_directory(path: str | os.PathLike[str]) -> None:
 
 
 def make_symlink(
-    pathorig: str | os.PathLike[str], pathlink: str | os.PathLike[str]
+    pathorig: str | os.PathLike[str],
+    pathlink: str | os.PathLike[str],
+    *,
+    overwrite: bool = False,
 ) -> None:
-    """Replace a symbolic link and narrate the filesystem write."""
+    """Replace a symbolic link; replacing a regular file requires opt-in."""
 
     print(f"Writing to {pathlink}...")
     if os.path.lexists(pathlink):
+        if not os.path.islink(pathlink):
+            if not overwrite:
+                raise FileExistsError(f"Refusing to replace non-symlink path: {pathlink}")
+            if os.path.isdir(pathlink):
+                raise IsADirectoryError(pathlink)
         os.unlink(pathlink)
     os.symlink(pathorig, pathlink)
 

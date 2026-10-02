@@ -37,7 +37,7 @@ python -m pip install -e .
 export TDPY_PATH=/path/to/tdpy
 ```
 
-`TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Dataset-specific helpers continue to use their established `*_DATA_PATH` variables.
+`TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Other repositories follow the same `<REPOSITORY>_PATH` root convention.
 
 ## Console output
 

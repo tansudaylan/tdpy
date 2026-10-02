@@ -60,6 +60,27 @@ def test_linearized_gaussian_retrieval_returns_covariance_and_recovery():
     np.testing.assert_allclose(recovery, np.diag([1.0, 0.5]))
 
 
+def test_linearized_gaussian_retrieval_rejects_unconstrained_null_direction():
+    model = lambda values: np.array([values[0] + values[1]])
+
+    with pytest.raises(ValueError, match="rank deficient"):
+        linearized_gaussian_retrieval(
+            np.zeros(2), np.ones(2), model, np.eye(1), np.full(2, np.inf)
+        )
+
+
+def test_linearized_gaussian_retrieval_proper_prior_constrains_null_direction():
+    model = lambda values: np.array([values[0] + values[1]])
+
+    parameter_covariance, recovery, jacobian = linearized_gaussian_retrieval(
+        np.zeros(2), np.ones(2), model, np.eye(1), np.array([np.inf, 1.0])
+    )
+
+    np.testing.assert_allclose(jacobian, [[1.0, 1.0]])
+    assert np.linalg.eigvalsh(parameter_covariance).min() > 0.0
+    assert np.isfinite(recovery).all()
+
+
 def test_profile_grid_models_selects_best_nuisance_model_per_group():
     profiles = profile_grid_models(
         np.array([3.0, 5.0]),

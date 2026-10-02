@@ -60,3 +60,18 @@ def test_narrated_filesystem_helpers_replace_symlink(tmp_path, capsys):
         f"Writing to {link_path}...",
         f"Writing to {link_path}...",
     ]
+
+
+def test_make_symlink_preserves_regular_file_unless_overwrite_is_explicit(tmp_path):
+    target = tmp_path / "target.txt"
+    destination = tmp_path / "destination.txt"
+    target.write_text("target", encoding="utf-8")
+    destination.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="Refusing to replace"):
+        make_symlink(target, destination)
+    assert destination.read_text(encoding="utf-8") == "keep"
+
+    make_symlink(target, destination, overwrite=True)
+    assert destination.is_symlink()
+    assert destination.read_text(encoding="utf-8") == "target"

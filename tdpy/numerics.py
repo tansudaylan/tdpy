@@ -78,8 +78,23 @@ def linearized_gaussian_retrieval(
     jacobian = finite_difference_jacobian(parameters, steps, model)
     inverse_covariance = np.linalg.inv(covariance)
     fisher = jacobian.T @ inverse_covariance @ jacobian
-    prior_precision = np.where(np.isfinite(prior_sigmas), prior_sigmas**-2, 0.0)
-    parameter_covariance = np.linalg.pinv(fisher + np.diag(prior_precision))
+    prior_sigmas = np.asarray(prior_sigmas, dtype=float)
+    if prior_sigmas.shape != (jacobian.shape[1],) or np.isnan(prior_sigmas).any() or np.any(prior_sigmas <= 0.0):
+        raise ValueError("prior_sigmas must contain one positive value or infinity per parameter.")
+    prior_precision = np.zeros_like(prior_sigmas)
+    finite_prior = np.isfinite(prior_sigmas)
+    prior_precision[finite_prior] = prior_sigmas[finite_prior] ** -2
+    posterior_precision = fisher + np.diag(prior_precision)
+    posterior_precision = 0.5 * (posterior_precision + posterior_precision.T)
+    try:
+        np.linalg.cholesky(posterior_precision)
+    except np.linalg.LinAlgError as error:
+        raise ValueError(
+            "The local posterior is rank deficient; constrain every null direction with a proper prior."
+        ) from error
+    parameter_covariance = np.linalg.solve(
+        posterior_precision, np.eye(posterior_precision.shape[0])
+    )
     recovery = parameter_covariance @ jacobian.T @ inverse_covariance
     return parameter_covariance, recovery, jacobian
 
