@@ -4148,9 +4148,9 @@ def retr_pathenv(nameenv):
 
 
 def retr_pathbase(strg):
-    """Return the normalized base directory defined by <STRG>_DATA_PATH."""
+    """Return the repository root defined by <STRG>_PATH."""
 
-    nameenv = '%s_DATA_PATH' % strg.upper()
+    nameenv = '%s_PATH' % strg.upper()
     pathbase = retr_pathenv(nameenv)
 
     return pathbase

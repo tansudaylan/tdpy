@@ -5,17 +5,17 @@ from tdpy import paths as tdpy_paths
 
 
 def test_retr_pathbase_normalizes_and_requires_env(monkeypatch, tmp_path):
-    monkeypatch.delenv('TDPY_DATA_PATH', raising=False)
+    monkeypatch.delenv('TDPY_PATH', raising=False)
 
     try:
         tdpy.retr_pathbase('tdpy')
     except EnvironmentError as exc:
-        assert 'TDPY_DATA_PATH' in str(exc)
+        assert 'TDPY_PATH' in str(exc)
     else:
         raise AssertionError('retr_pathbase() should fail when the environment variable is unset.')
 
     raw_path = tmp_path / 'nested' / '..' / 'science'
-    monkeypatch.setenv('TDPY_DATA_PATH', str(raw_path))
+    monkeypatch.setenv('TDPY_PATH', str(raw_path))
 
     pathbase = tdpy.retr_pathbase('tdpy')
 
@@ -35,7 +35,7 @@ def test_retr_pathenv_normalizes_generic_env(monkeypatch, tmp_path):
 
 
 def test_retr_path_creates_visual_and_data_directories(monkeypatch, tmp_path):
-    monkeypatch.setenv('TDPY_DATA_PATH', str(tmp_path))
+    monkeypatch.setenv('TDPY_PATH', str(tmp_path))
 
     pathvisu, pathdata = tdpy.retr_path('tdpy', pathextndata='demo', pathextnimag='demo', rtag='case')
 
