@@ -41,6 +41,7 @@ from .plotting import (
     save_current_figure,
     save_figure,
 )
+from .paths import RepositoryPaths, get_data_path
 
 
 def narrate(typeverb, message, level=1):
@@ -3457,7 +3458,8 @@ def retr_evttferm(recotype):
 
 def writ_sbrtfdfm(numbside=256, regitype='igal', binsenertype='full', recotype='rec7'):
     
-    pathdata = os.environ["PCAT_DATA_PATH"] + '/data/'
+    pathdata = str(RepositoryPaths('PCAT_PATH').get_data_path()) + os.sep
+    os.makedirs(pathdata, exist_ok=True)
     
     evtt, numbevtt, indxevtt = retr_evttferm(recotype)
     
@@ -3836,7 +3838,7 @@ def retr_sbrtfdfm(binsener, numbside=256, vfdm=7):
 
     numbpixl = numbside**2 * 12
     
-    path = os.environ["TDPY_DATA_PATH"] + '/data/'
+    path = str(get_data_path()) + os.sep
     if vfdm == 2:
         path += 'gll_iem_v02.fit'
     if vfdm == 3:
@@ -4257,7 +4259,7 @@ def smth_ferm(mapsinpt, meanener, recotype, maxmmpol=None, makeplot=False, kernt
         
         if recotype != 'manu':
             gdat = gdatstrt()
-            gdat.pathdata = os.environ["PCAT_DATA_PATH"] + '/data/'
+            gdat.pathdata = str(RepositoryPaths('PCAT_PATH').get_data_path()) + os.sep
             gdat.numbener = numbener
             gdat.indxener = indxener
             gdat.numbevtt = numbevtt
@@ -4398,6 +4400,9 @@ def plot_fermsmth():
     mpol = np.arange(maxmmpol + 1)
     
     listrecotype = ['rec7', 'rec8']
+    pathdataferm = str(RepositoryPaths('FERM_IGAL_PATH').get_data_path()) + os.sep
+    pathvisualsferm = str(RepositoryPaths('FERM_IGAL_PATH').get_visuals_path()) + os.sep
+    os.makedirs(pathvisualsferm, exist_ok=True)
     for recotype in listrecotype:
         evtt, numbevtt, indxevtt = retr_evttferm(recotype)
         
@@ -4410,7 +4415,7 @@ def plot_fermsmth():
 
         plt.loglog(mpol, almcinpt, label='HealPix')
         plt.loglog(mpol, np.sqrt((2. * mpol + 1.) / 4. / np.pi), label='Analytic')
-        path = os.environ["FERM_IGAL_DATA_PATH"] + '/visuals/almcinpt.%s' % typefileplot
+        path = pathvisualsferm + 'almcinpt.%s' % typefileplot
         plt.legend(framealpha=1.)
         figr.savefig(path)
         plt.close(figr)
@@ -4420,7 +4425,7 @@ def plot_fermsmth():
             for m in indxevtt:
                 plt.loglog(mpol, almcoutp[i, :, m], label='$E=%.3g$, PSF%d' % (meanenerplot[i], indxevtt[m]))
         plt.legend(loc=3, framealpha=1.)
-        path = os.environ["FERM_IGAL_DATA_PATH"] + '/visuals/almcoutp.%s' % typefileplot
+        path = pathvisualsferm + 'almcoutp.%s' % typefileplot
         figr.savefig(path)
         plt.close(figr)
             
@@ -4429,7 +4434,7 @@ def plot_fermsmth():
             for m in indxevtt:
                 plt.loglog(mpol, tranfunc[i, :, m], label='$E=%.3g$, PSF%d' % (meanenerplot[i], indxevtt[m]))
         plt.legend(loc=3, framealpha=1.)
-        path = os.environ["FERM_IGAL_DATA_PATH"] + '/visuals/tranfunc.%s' % typefileplot
+        path = pathvisualsferm + 'tranfunc.%s' % typefileplot
         figr.savefig(path)
         plt.close(figr)
         
@@ -4440,7 +4445,7 @@ def plot_fermsmth():
         maxmbgal = maxmgang
             
         # get the Planck radiance map
-        path = os.environ["FERM_IGAL_DATA_PATH"] + '/HFI_CompMap_ThermalDustModel_2048_R1.20.fits'
+        path = pathdataferm + 'HFI_CompMap_ThermalDustModel_2048_R1.20.fits'
         maps = pf.getdata(path, 1)['RADIANCE']
         mapstemp = hp.ud_grade(maps, numbside, order_in='NESTED', order_out='RING')
         maps = np.empty((numbenerplot, numbpixl, numbevtt))
@@ -4455,15 +4460,15 @@ def plot_fermsmth():
         mapssmthgaus =  hp.sphtfunc.smoothing(mapstemp, sigma=np.deg2rad(0.5))
 
         # plot the maps
-        path = os.environ["FERM_IGAL_DATA_PATH"] + '/visuals/maps.%s' % typefileplot
+        path = pathvisualsferm + 'maps.%s' % typefileplot
         plot_maps(path, mapstemp, minmlgal=minmlgal, maxmlgal=maxmlgal, minmbgal=minmbgal, maxmbgal=maxmbgal)
 
         for i in np.arange(meanenerplot.size):
             for m in indxevtt:
-                path = os.environ["FERM_IGAL_DATA_PATH"] + '/visuals/mapssmthferm%d%d.%s' % (i, m, typefileplot)
+                path = pathvisualsferm + 'mapssmthferm%d%d.%s' % (i, m, typefileplot)
                 plot_maps(path, mapssmthferm[i, :, m], minmlgal=minmlgal, maxmlgal=maxmlgal, minmbgal=minmbgal, maxmbgal=maxmbgal)
                 
-        path = os.environ["FERM_IGAL_DATA_PATH"] + '/visuals/mapssmthgaus.%s' % typefileplot
+        path = pathvisualsferm + 'mapssmthgaus.%s' % typefileplot
         plot_maps(path, mapssmthgaus, minmlgal=minmlgal, maxmlgal=maxmlgal, minmbgal=minmbgal, maxmbgal=maxmbgal)
 
 
