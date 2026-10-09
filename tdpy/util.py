@@ -189,7 +189,7 @@ class gdatstrtpcat(object):
         #    if not isinstance(valu, int64) and len(valu) > 6:
         #        raise Exception('Setting gdatmodi.indxsampmodi to an array!')
         
-        super(gdatstrt, self).__setattr__(attr, valu)
+        super(gdatstrtpcat, self).__setattr__(attr, valu)
 
 
 def retr_dictlabl():
@@ -269,7 +269,7 @@ def time_func(func, *args):
         func(*args)
         timediff[k] = time.time() - timeinit
     
-    return mean(timediff), std(timediff)
+    return np.mean(timediff), np.std(timediff)
 
 
 def time_func_verb(func, *args):
@@ -492,7 +492,7 @@ def cdfn_expo(parascal, maxm, scal):
     Return the CDF transform of a variable drawrn from the exponential distribution
     '''
 
-    paraunit = (1. - np.exp(-parascal / maxm)) / (1. - np.exp(-maxm / scal))
+    paraunit = (1. - np.exp(-parascal / scal)) / (1. - np.exp(-maxm / scal))
 
     return paraunit
 

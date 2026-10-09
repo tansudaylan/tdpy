@@ -19,12 +19,38 @@ from tdpy.numerics import (
     template_amplitude_forecast,
     template_goodness_of_fit,
 )
+from tdpy.util import cdfn_expo, gdatstrtpcat
 
 
 def test_prior_transforms_round_trip():
     assert icdf_self(cdfn_self(3.0, 1.0, 5.0), 1.0, 5.0) == pytest.approx(3.0)
     assert icdf_logt(cdfn_logt(10.0, 1.0, 100.0), 1.0, 100.0) == pytest.approx(10.0)
     assert icdf_gaus(cdfn_gaus(3.0, 2.0, 4.0), 2.0, 4.0) == pytest.approx(3.0)
+
+
+def test_exponential_cdf_uses_scale_and_reaches_upper_endpoint():
+    assert cdfn_expo(2.0, 10.0, 2.0) == pytest.approx(
+        (1.0 - np.exp(-1.0)) / (1.0 - np.exp(-5.0))
+    )
+    assert cdfn_expo(10.0, 10.0, 2.0) == pytest.approx(1.0)
+
+
+def test_pcat_state_accepts_valid_attribute_assignment():
+    state = gdatstrtpcat()
+    state.testname = "value"
+    assert state.testname == "value"
+
+
+def test_time_func_returns_timing_statistics(monkeypatch):
+    import tdpy.util as util
+
+    times = iter(np.arange(200, dtype=float) * 0.5)
+    monkeypatch.setattr(util.time, "time", lambda: next(times))
+
+    mean, standard_deviation = util.time_func(lambda: None)
+
+    assert mean == pytest.approx(0.5)
+    assert standard_deviation == pytest.approx(0.0)
 
 
 def test_bin_spectrum_averages_samples_within_each_bin():
