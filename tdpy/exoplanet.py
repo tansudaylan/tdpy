@@ -11,6 +11,18 @@ import numpy as np
 from scipy.stats import chi2, ncx2
 
 from .numerics import bin_spectrum, interval_contrast_weights
+from .plotting import WASHU_GRAY, WASHU_GREEN, WASHU_RED
+
+
+_DISCOVERY_TARGET_COLORS = (
+    WASHU_RED,
+    WASHU_GREEN,
+    WASHU_GRAY,
+    "#0072B2",
+    "#D55E00",
+    "#CC79A7",
+    "#E69F00",
+)
 
 
 def quadratic_to_kipping_limb_darkening(
@@ -417,5 +429,186 @@ def plot_paired_band_contrasts(
     figure.subplots_adjust(left=0.18, right=0.98, bottom=0.29, top=0.54)
     print(f"Writing to {output_path}...")
     figure.savefig(output_path, dpi=300 if output_path.suffix == ".png" else None)
+    plt.close(figure)
+    return output_path
+
+
+def _prepare_discovery_planets(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Keep confirmed-planet rows with finite discovery, period, and radius data."""
+    planets = []
+    for row in rows:
+        try:
+            discovery_year = int(float(row["disc_year"]))
+            orbital_period = float(row["pl_orbper"])
+            planet_radius = float(row["pl_rade"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not np.isfinite((discovery_year, orbital_period, planet_radius)).all():
+            continue
+        if orbital_period <= 0.0 or planet_radius <= 0.0:
+            continue
+        hostname = str(row.get("hostname", "")).strip()
+        planet_name = str(row.get("pl_name", "")).strip()
+        if not hostname or not planet_name:
+            continue
+        planets.append(
+            {
+                "hostname": hostname,
+                "pl_name": planet_name,
+                "discoverymethod": str(row.get("discoverymethod") or "Unknown"),
+                "disc_year": discovery_year,
+                "pl_orbper": orbital_period,
+                "pl_rade": planet_radius,
+            }
+        )
+    if not planets:
+        raise ValueError("rows must contain confirmed planets with discovery year, period, and radius")
+    return planets
+
+
+def _discovery_target_colors(
+    highlighted_targets: Mapping[str, str],
+    target_colors: Mapping[str, str] | None,
+) -> dict[str, str]:
+    """Return stable colors for highlighted host names."""
+    supplied_colors = target_colors or {}
+    return {
+        hostname: supplied_colors.get(hostname, _DISCOVERY_TARGET_COLORS[index % len(_DISCOVERY_TARGET_COLORS)])
+        for index, hostname in enumerate(highlighted_targets)
+    }
+
+
+def plot_exoplanet_discovery_timeline(
+    rows: Sequence[Mapping[str, Any]],
+    highlighted_targets: Mapping[str, str],
+    output_path: str | Path,
+    *,
+    target_colors: Mapping[str, str] | None = None,
+) -> Path:
+    """Plot confirmed-planet discoveries by year and method, marking selected systems."""
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    planets = _prepare_discovery_planets(rows)
+    output_path = Path(output_path)
+    discovery_years = np.asarray([planet["disc_year"] for planet in planets])
+    years = np.arange(discovery_years.min(), discovery_years.max() + 1)
+    method_totals: dict[str, int] = {}
+    for planet in planets:
+        method = planet["discoverymethod"]
+        method_totals[method] = method_totals.get(method, 0) + 1
+    ranked_methods = sorted(method_totals, key=method_totals.get, reverse=True)
+    displayed_methods = ranked_methods[:5]
+    if len(ranked_methods) > len(displayed_methods):
+        displayed_methods.append("Other methods")
+    method_colors = plt.get_cmap("tab10")
+
+    figure, axis = plt.subplots(figsize=(10.0, 4.8), facecolor="white")
+    bottom = np.zeros(years.size, dtype=int)
+    method_handles = []
+    for method_index, method in enumerate(displayed_methods):
+        selected = [
+            planet for planet in planets
+            if planet["discoverymethod"] == method
+            or (method == "Other methods" and planet["discoverymethod"] not in ranked_methods[:5])
+        ]
+        counts = np.asarray(
+            [sum(planet["disc_year"] == year for planet in selected) for year in years],
+            dtype=int,
+        )
+        color = method_colors(method_index / max(len(displayed_methods), 1))
+        axis.bar(years, counts, bottom=bottom, width=0.86, color=color, linewidth=0.0)
+        bottom += counts
+        method_handles.append(Patch(facecolor=color, label=method))
+
+    target_styles = _discovery_target_colors(highlighted_targets, target_colors)
+    target_handles = []
+    for hostname, label in highlighted_targets.items():
+        target_planets = [planet for planet in planets if planet["hostname"] == hostname]
+        if not target_planets:
+            continue
+        discovery_year = min(planet["disc_year"] for planet in target_planets)
+        color = target_styles[hostname]
+        axis.axvline(discovery_year, color=color, linewidth=1.4, linestyle="--", alpha=0.9)
+        target_handles.append(
+            Line2D([], [], color=color, linestyle="--", linewidth=1.6,
+                   label=f"{label} ({discovery_year})")
+        )
+
+    axis.set_xlabel("Discovery year")
+    axis.set_ylabel("Confirmed planets discovered")
+    axis.set_xlim(years[0] - 0.6, years[-1] + 0.6)
+    tick_step = 1 if years.size <= 16 else 2
+    axis.set_xticks(years[::tick_step])
+    axis.grid(axis="y", color="#D8DEDF", linewidth=0.7, alpha=0.8)
+    axis.set_axisbelow(True)
+    axis.spines[["top", "right"]].set_visible(False)
+    figure.legend(
+        method_handles + target_handles,
+        [handle.get_label() for handle in method_handles + target_handles],
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.0),
+        ncol=4,
+        frameon=False,
+        fontsize=8,
+    )
+    figure.subplots_adjust(left=0.10, right=0.98, top=0.98, bottom=0.28)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=300 if output_path.suffix.lower() == ".png" else None,
+                   bbox_inches="tight", facecolor="white")
+    plt.close(figure)
+    return output_path
+
+
+def plot_exoplanet_period_radius(
+    rows: Sequence[Mapping[str, Any]],
+    highlighted_targets: Mapping[str, str],
+    output_path: str | Path,
+    *,
+    target_colors: Mapping[str, str] | None = None,
+) -> Path:
+    """Plot confirmed-planet radius against orbital period and highlight target systems."""
+    planets = _prepare_discovery_planets(rows)
+    output_path = Path(output_path)
+    figure, axis = plt.subplots(figsize=(8.2, 5.2), facecolor="white")
+    axis.scatter(
+        [planet["pl_orbper"] for planet in planets],
+        [planet["pl_rade"] for planet in planets],
+        s=12,
+        color="#9BA3A5",
+        alpha=0.28,
+        linewidths=0.0,
+        rasterized=True,
+        label="Other confirmed planets",
+    )
+    target_styles = _discovery_target_colors(highlighted_targets, target_colors)
+    for hostname, label in highlighted_targets.items():
+        target_planets = [planet for planet in planets if planet["hostname"] == hostname]
+        if not target_planets:
+            continue
+        axis.scatter(
+            [planet["pl_orbper"] for planet in target_planets],
+            [planet["pl_rade"] for planet in target_planets],
+            s=58,
+            color=target_styles[hostname],
+            edgecolors="white",
+            linewidths=0.7,
+            label=f"{label} ({len(target_planets)})",
+            zorder=3,
+        )
+
+    axis.set_xscale("log")
+    axis.set_yscale("log")
+    axis.set_xlabel("Orbital period [day]")
+    axis.set_ylabel("Planet radius [Earth radii]")
+    axis.grid(which="major", color="#D8DEDF", linewidth=0.7, alpha=0.8)
+    axis.grid(which="minor", color="#E8ECED", linewidth=0.5, alpha=0.6)
+    axis.set_axisbelow(True)
+    axis.spines[["top", "right"]].set_visible(False)
+    axis.legend(loc="lower right", fontsize=8, frameon=True, framealpha=0.95)
+    figure.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=300 if output_path.suffix.lower() == ".png" else None,
+                   bbox_inches="tight", facecolor="white")
     plt.close(figure)
     return output_path

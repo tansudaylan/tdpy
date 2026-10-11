@@ -6,6 +6,8 @@ from tdpy.exoplanet import (
     keplerian_radial_velocity,
     kipping_to_quadratic_limb_darkening,
     paired_interval_contrast_forecast,
+    plot_exoplanet_discovery_timeline,
+    plot_exoplanet_period_radius,
     plot_atmosphere_spectra,
     plot_paired_band_contrasts,
     quadratic_limb_darkened_stellar_grid,
@@ -96,3 +98,31 @@ def test_exoplanet_forecast_plots_write_requested_files(tmp_path):
     )
     assert atmosphere_path.is_file()
     assert contrast_path.is_file()
+
+
+def test_exoplanet_discovery_plots_highlight_selected_systems(tmp_path):
+    planets = [
+        {"pl_name": "HD 108147 b", "hostname": "HD 108147", "discoverymethod": "Radial Velocity",
+         "disc_year": "2002", "pl_orbper": "10.9", "pl_rade": "10.9"},
+        {"pl_name": "WASP-39 b", "hostname": "WASP-39", "discoverymethod": "Transit",
+         "disc_year": "2011", "pl_orbper": "4.05", "pl_rade": "14.3"},
+        {"pl_name": "TRAPPIST-1 b", "hostname": "TRAPPIST-1", "discoverymethod": "Transit",
+         "disc_year": "2016", "pl_orbper": "1.51", "pl_rade": "1.12"},
+        {"pl_name": "unmeasured planet", "hostname": "Unknown", "discoverymethod": "Transit",
+         "disc_year": "", "pl_orbper": "", "pl_rade": ""},
+    ]
+    targets = {
+        "HD 108147": "TOI-1233 / HD 108147",
+        "WASP-39": "WASP-39",
+        "TRAPPIST-1": "TRAPPIST-1",
+    }
+
+    timeline_path = plot_exoplanet_discovery_timeline(
+        planets, targets, tmp_path / "discovery_timeline.png"
+    )
+    period_radius_path = plot_exoplanet_period_radius(
+        planets, targets, tmp_path / "period_radius.png"
+    )
+
+    assert timeline_path.is_file() and timeline_path.stat().st_size > 1000
+    assert period_radius_path.is_file() and period_radius_path.stat().st_size > 1000

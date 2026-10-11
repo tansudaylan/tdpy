@@ -124,6 +124,22 @@ The second animation shows the 8,148 TOI candidates in the [ExoFOP TESS TOI tabl
 
 Static figures are written directly under `examples/tess_visibility/visuals/`. The example also writes one map per requested static-map sector. Runtime and memory scale with the number of animated sectors; use `--animation-sectors 1 2 3 4` for a short development run. The footprint boundary follows nominal detector geometry in `tesswcs`; future pointings remain provisional, and the maps do not model scattered light, data-quality masks, cadence availability, or target-specific postage-stamp allocation.
 
+## Exoplanet discoveries and target systems
+
+The [`exoplanet_discoveries` example](examples/exoplanet_discoveries/run.py) plots confirmed planets from [NASA's Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/), downloaded on October 11, 2026, and bundles the queried rows for offline reruns. TOI-1233 is listed in the archive under its host-star name, HD 108147. It is highlighted alongside WASP-39, WASP-121, TRAPPIST-1, TOI-270, and TOI-700 in a discovery timeline and a period-radius comparison. The timeline separates discoveries by method and marks each selected system's first listed discovery year.
+
+Run the example from the TDpy repository root with:
+
+```bash
+python examples/exoplanet_discoveries/run.py
+```
+
+Add `--refresh-data` to query NASA's Exoplanet Archive again.
+
+![Confirmed exoplanet discoveries by year and discovery method, with TOI-1233 and other target systems highlighted](examples/exoplanet_discoveries/visuals/exoplanet_discovery_timeline.png)
+
+![Orbital period and radius of confirmed planets, with TOI-1233 and other target systems highlighted](examples/exoplanet_discoveries/visuals/exoplanet_period_radius.png)
+
 ## Data paths
 
 TDpy normalizes environment-backed input and output paths with:

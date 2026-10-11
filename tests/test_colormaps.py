@@ -21,3 +21,14 @@ def test_make_cmapdivg_is_white_centered():
     np.testing.assert_allclose(cmap(0.)[:3], matplotlib.colors.to_rgb('Red'))
     np.testing.assert_allclose(cmap(0.5)[:3], (1., 1., 1.), atol=0.01)
     np.testing.assert_allclose(cmap(1.)[:3], matplotlib.colors.to_rgb('Orange'))
+
+
+def test_washu_palette_is_exported():
+    assert tdpy.WASHU_RED == "#A51417"
+    assert tdpy.WASHU_GREEN == "#007360"
+    assert tdpy.WASHU_GRAY == "#6C7373"
+    assert tdpy.WASHU_COLORS == {
+        "red": tdpy.WASHU_RED,
+        "green": tdpy.WASHU_GREEN,
+        "gray": tdpy.WASHU_GRAY,
+    }

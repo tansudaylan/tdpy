@@ -7,6 +7,15 @@ from tdpy.verbosity import print
 import matplotlib.pyplot as plt
 import numpy as np
 
+WASHU_RED = "#A51417"
+WASHU_GREEN = "#007360"
+WASHU_GRAY = "#6C7373"
+WASHU_COLORS = {
+    "red": WASHU_RED,
+    "green": WASHU_GREEN,
+    "gray": WASHU_GRAY,
+}
+
 
 def plot_file_path(path, typefileplot="png"):
     """Return a plot path with the requested supported extension."""
@@ -45,6 +54,17 @@ def save_figure(
     """Save a figure with a consistent background, axes, and output format."""
     path = plot_file_path(path, typefileplot)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
+
+    if getattr(figure, "axes", None):
+        figure.subplots_adjust(
+            left=0.12,
+            right=0.98,
+            bottom=0.14,
+            top=0.92,
+            wspace=0.18,
+            hspace=0.18,
+        )
+
     color_background, color_foreground = plot_background_colors(typeplotback)
     figure.patch.set_facecolor(color_background)
     for axis in figure.axes:
@@ -57,7 +77,7 @@ def save_figure(
         axis.yaxis.label.set_color(color_foreground)
         axis.title.set_color(color_foreground)
 
-    arguments = {"facecolor": color_background, "bbox_inches": "tight"}
+    arguments = {"facecolor": color_background, "bbox_inches": "tight", "pad_inches": 0.02}
     if typefileplot == "png":
         arguments["dpi"] = 300
     arguments.update(kwargs)
@@ -124,6 +144,10 @@ def write_animation(frames, path, duration_ms=200, loop=0):
 
 
 __all__ = [
+    "WASHU_COLORS",
+    "WASHU_GRAY",
+    "WASHU_GREEN",
+    "WASHU_RED",
     "figure_to_frame",
     "normalize_plot_background",
     "plot_background_colors",
