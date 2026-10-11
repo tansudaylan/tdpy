@@ -2,16 +2,16 @@
 
 ## Purpose
 
-TDpy provides numerical, plotting, and path-handling utilities for astrophysical analysis. Users can normalize environment-based data paths, transform scientific arrays, annotate source catalogs, and create reproducible diagnostic figures from simulated or observed data.
+TDpy collects the numerical, plotting, and path utilities used across astrophysical analyses. It helps scripts and notebooks handle scientific arrays, annotate source catalogs, and find data and output directories without depending on one workstation's filesystem.
 
-The functions are designed for direct use in scripts, notebooks, and larger analysis pipelines.
+Use the functions directly in a short script or as building blocks in a larger analysis.
 
 ## What it provides
 
 The library includes utilities for:
 
 - environment-based filesystem and data-path normalization;
-- reusable plotting helpers for population and catalog diagnostics;
+- reusable plots for population and catalog analyses;
 - numerical support for array handling and scientific transforms;
 - light-weight visualization utilities used across time-domain and catalog workflows;
 - reproducible output layout for figures and intermediate diagnostic products.
@@ -20,8 +20,8 @@ The library includes utilities for:
 
 - configure portable data and output paths;
 - annotate source catalogs and visualize population parameters;
-- inspect intermediate analysis states with diagnostic plots;
-- apply general numerical transforms used in astronomical analyses.
+- inspect intermediate analysis states with plots;
+- apply general numerical transforms used in astronomical analyses;
 - build periodic-event timing and overlap reports with `tdpy.astro`;
 - calculate interval contrasts and render atmosphere forecast figures with `tdpy.exoplanet`;
 - construct normalized NIRSpec calculations with `tdpy.pandeia`;
