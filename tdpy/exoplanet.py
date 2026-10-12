@@ -64,6 +64,74 @@ def quadratic_limb_darkening(
     )
 
 
+def stellar_limb_darkened_brightness(
+    cosine_emission_angle: float | np.ndarray,
+    coefficients: tuple[float, ...] | list[float] | np.ndarray,
+    baseline_brightness: float | np.ndarray = 1.0,
+    law: str = "quad",
+    *,
+    brgtraww: float | np.ndarray | None = None,
+    typelmdk: str | None = None,
+) -> float | np.ndarray:
+    """Evaluate limb-darkened stellar surface brightness for common laws."""
+
+    if brgtraww is not None:
+        baseline_brightness = brgtraww
+    if typelmdk is not None:
+        law = typelmdk
+
+    cosg = np.asarray(cosine_emission_angle, dtype=float)
+    if law == "linr":
+        factor = 1.0 - coefficients[0] * (1.0 - cosg)
+    elif law in ("quad", "quadkipp"):
+        factor = quadratic_limb_darkening(cosg, coefficients)
+    elif law == "nlin":
+        if len(coefficients) != 3:
+            raise ValueError("The nlin limb-darkening law requires three coefficients.")
+        factor = (
+            1.0
+            - coefficients[0] * (1.0 - np.sqrt(np.maximum(cosg, 0.0)))
+            - coefficients[1] * (1.0 - cosg)
+            - coefficients[2] * (1.0 - cosg**1.5)
+        )
+    elif law == "none":
+        factor = np.ones_like(cosg)
+    else:
+        raise ValueError(f"Unsupported limb-darkening law {law!r}.")
+
+    result = np.asarray(baseline_brightness) * factor
+    if cosg.ndim == 0 and np.ndim(baseline_brightness) == 0:
+        return float(result)
+    return result
+
+
+retr_brgtlmdk = stellar_limb_darkened_brightness
+
+
+def relative_flux_from_delta_magnitude(
+    delta_magnitude: float | np.ndarray,
+    uncertainty: float | np.ndarray | None = None,
+    *,
+    stdvdmag: float | np.ndarray | None = None,
+) -> float | np.ndarray | tuple[float | np.ndarray, float | np.ndarray]:
+    """Convert delta magnitude to relative flux and optionally propagate error."""
+
+    if uncertainty is None and stdvdmag is not None:
+        uncertainty = stdvdmag
+
+    dmag = np.asarray(delta_magnitude, dtype=float)
+    flux = 10.0 ** (-dmag / 2.5)
+    if uncertainty is not None:
+        flux_err = np.log(10.0) / 2.5 * flux * np.asarray(uncertainty, dtype=float)
+        return flux, flux_err
+    if dmag.ndim == 0:
+        return float(flux)
+    return flux
+
+
+retr_rflxfromdmag = relative_flux_from_delta_magnitude
+
+
 def quadratic_limb_darkened_stellar_grid(
     grid_size: int,
     coefficients: tuple[float, float],
@@ -612,3 +680,546 @@ def plot_exoplanet_period_radius(
                    bbox_inches="tight", facecolor="white")
     plt.close(figure)
     return output_path
+
+
+def fold_tser(
+    arry: np.ndarray,
+    epoc: float,
+    peri: float,
+    boolxdattime: bool = False,
+    boolsort: bool = True,
+    phascntr: float = 0.5,
+    booldiag: bool = True,
+) -> np.ndarray:
+    """Fold a 2D or 3D time series on period and reference epoch."""
+
+    arry = np.asarray(arry)
+    if arry.ndim == 3:
+        time = arry[:, 0, 0]
+    elif arry.ndim == 2:
+        time = arry[:, 0]
+    else:
+        raise ValueError('arry should be two- or three-dimensional.')
+
+    arryfold = np.empty_like(arry)
+
+    phasinit = ((time - epoc) % peri) / peri
+    phasdiff = 0.5 - phascntr
+    xdat = (phasinit + phasdiff) % 1.0 - phasdiff
+
+    if boolxdattime:
+        xdat *= peri
+
+    if arry.ndim == 3:
+        arryfold[:, 0, 0] = xdat
+    else:
+        arryfold[:, 0] = xdat
+
+    arryfold[:, ..., 1:] = arry[:, ..., 1:]
+
+    if boolsort:
+        indx = np.argsort(xdat)
+        arryfold = arryfold[indx]
+
+    return arryfold
+
+
+def retr_lcurmodl_flarsing(
+    meantime: np.ndarray,
+    timeflar: float,
+    amplflar: float,
+    scalrise: float,
+    scalfall: float,
+) -> np.ndarray:
+    """Evaluate a fast-rise exponential-decay stellar flare light curve."""
+
+    time_array = np.asarray(meantime, dtype=float)
+    if time_array.size == 0:
+        raise ValueError('meantime must not be empty.')
+    lcur = np.empty_like(time_array)
+    mask_rise = time_array < timeflar
+    lcur[mask_rise] = np.exp((time_array[mask_rise] - timeflar) / scalrise)
+    lcur[~mask_rise] = np.exp(-(time_array[~mask_rise] - timeflar) / scalfall)
+    peak_flux = np.amax(lcur)
+    if peak_flux > 0.0:
+        lcur *= amplflar / peak_flux
+    return lcur
+
+
+def retr_smaxkepl(
+    peri: float | np.ndarray,
+    masstotl: float | np.ndarray,
+    factnonk: float = 1.0,
+) -> float | np.ndarray:
+    """Calculate the semi-major axis in AU using Kepler's third law."""
+
+    kepler_factor = 7.496e-6  # [AU^3 / (M_sun day^2)]
+    smax = (kepler_factor * masstotl * (peri / factnonk) ** 2) ** (1.0 / 3.0)  # [AU]
+    return smax
+
+
+def retr_perikepl(
+    smax: float | np.ndarray,
+    masstotl: float | np.ndarray,
+    factnonk: float = 1.0,
+) -> float | np.ndarray:
+    """Calculate the orbital period in days using Kepler's third law."""
+
+    kepler_factor = 7.496e-6  # [AU^3 / (M_sun day^2)]
+    peri = np.sqrt(smax ** 3 / kepler_factor / masstotl) * factnonk  # [day]
+    return peri
+
+
+def retr_vesc(
+    massplan: float | np.ndarray,
+    radicomp: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the planetary surface escape velocity in km/s."""
+
+    escape_velocity_earth = 11.2  # [km / s]
+    return escape_velocity_earth * np.sqrt(np.asarray(massplan) / np.asarray(radicomp))
+
+
+def retr_rs2a(
+    rsmacomp: float | np.ndarray,
+    rrat: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the stellar radius divided by the semi-major axis."""
+
+    return np.asarray(rsmacomp) / (1.0 + np.asarray(rrat))
+
+
+def retr_rsmacomp(
+    peri: float | np.ndarray,
+    dura: float | np.ndarray,
+    cosi: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the sum of stellar and companion radii divided by semi-major axis."""
+
+    hours_per_day = 24.0  # [hour / day]
+    return np.sqrt(
+        np.sin(np.asarray(dura) * np.pi / np.asarray(peri) / hours_per_day) ** 2
+        + np.asarray(cosi) ** 2
+    )
+
+
+def retr_duratrantotl(
+    pericomp: float | np.ndarray,
+    rsmacomp: float | np.ndarray,
+    cosicomp: float | np.ndarray,
+    booldiag: bool = True,
+) -> float | np.ndarray:
+    """Return the total transit duration (first to fourth contact) in hours."""
+
+    pericomp_arr = np.asarray(pericomp, dtype=float)
+    rsmacomp_arr = np.asarray(rsmacomp, dtype=float)
+    cosicomp_arr = np.asarray(cosicomp, dtype=float)
+    hours_per_day = 24.0  # [hour / day]
+
+    fact = rsmacomp_arr ** 2 - cosicomp_arr ** 2
+    duratrantotl = np.zeros_like(pericomp_arr, dtype=float)
+    mask = fact >= 0.0
+    if np.any(mask):
+        cos_sub = np.where(mask, cosicomp_arr, 0.0)
+        sin_sub = np.sqrt(np.maximum(1.0 - cos_sub ** 2, 1e-12))
+        fact_sub = np.where(mask, fact, 0.0)
+        ratio = np.clip(np.sqrt(fact_sub) / sin_sub, -1.0, 1.0)
+        duration = hours_per_day * pericomp_arr / np.pi * np.arcsin(ratio)  # [hour]
+        duratrantotl = np.where(mask, duration, 0.0)
+
+    if pericomp_arr.ndim == 0:
+        return float(duratrantotl)
+    return duratrantotl
+
+
+def retr_duratranfull(
+    pericomp: float | np.ndarray,
+    rsmacomp: float | np.ndarray,
+    cosicomp: float | np.ndarray,
+    rratcomp: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the full transit duration (second to third contact) in hours."""
+
+    pericomp_arr = np.asarray(pericomp, dtype=float)
+    rsmacomp_arr = np.asarray(rsmacomp, dtype=float)
+    cosicomp_arr = np.asarray(cosicomp, dtype=float)
+    rratcomp_arr = np.asarray(rratcomp, dtype=float)
+    hours_per_day = 24.0  # [hour / day]
+
+    rdiacomp = rsmacomp_arr * (1.0 - 2.0 / (1.0 + rratcomp_arr))
+    fact = rdiacomp ** 2 - cosicomp_arr ** 2
+    duratranfull = np.full_like(pericomp_arr, np.nan, dtype=float)
+    mask = fact > 0.0
+    if np.any(mask):
+        cos_sub = np.where(mask, cosicomp_arr, 0.0)
+        sin_sub = np.sqrt(np.maximum(1.0 - cos_sub ** 2, 1e-12))
+        fact_sub = np.where(mask, fact, 0.0)
+        ratio = np.clip(np.sqrt(fact_sub) / sin_sub, -1.0, 1.0)
+        duration = hours_per_day * pericomp_arr / np.pi * np.arcsin(ratio)  # [hour]
+        duratranfull = np.where(mask, duration, np.nan)
+
+    if pericomp_arr.ndim == 0:
+        return float(duratranfull)
+    return duratranfull
+
+
+def retr_tsmm(
+    radicomp: float | np.ndarray,
+    tmptplan: float | np.ndarray,
+    massplan: float | np.ndarray,
+    radistar: float | np.ndarray,
+    jmag: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the Transmission Spectroscopy Metric (Kempton et al. 2018)."""
+
+    radius_arr = np.asarray(radicomp, dtype=float)
+    scale_factor = np.select(
+        [radius_arr < 1.5, radius_arr < 2.75, radius_arr < 4.0, radius_arr <= 10.0],
+        [0.190, 1.26, 1.28, 1.15],
+        default=np.nan,
+    )
+    return scale_factor * radius_arr ** 3 * np.asarray(tmptplan) / np.asarray(massplan) / np.asarray(radistar) ** 2 * 10.0 ** (-np.asarray(jmag) / 5.0)
+
+
+def retr_scalheig(
+    tmptplan: float | np.ndarray,
+    massplan: float | np.ndarray,
+    radicomp: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the atmospheric scale height in Jupiter radii."""
+
+    reference_scale = 27.0  # [R_J]
+    reference_temp = 160.0  # [K]
+    radius_jupiter_km = 71398.0  # [km]
+    return reference_scale * (np.asarray(tmptplan) / reference_temp) / (np.asarray(massplan) / np.asarray(radicomp) ** 2) / radius_jupiter_km  # [R_J]
+
+
+def retr_radiroch(
+    radistar: float | np.ndarray,
+    densstar: float | np.ndarray,
+    denscomp: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the Roche limit radius for tidal disruption."""
+
+    return np.asarray(radistar) * (2.0 * np.asarray(densstar) / np.asarray(denscomp)) ** (1.0 / 3.0)
+
+
+def retr_radihill(
+    smax: float | np.ndarray,
+    masscomp: float | np.ndarray,
+    massstar: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the Hill sphere radius in the same units as semi-major axis."""
+
+    return np.asarray(smax) * (np.asarray(masscomp) / (3.0 * np.asarray(massstar))) ** (1.0 / 3.0)
+
+
+def retr_logg(
+    radi: float | np.ndarray,
+    mass: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return surface gravity log10(g) in cgs [cm / s^2] from Solar units."""
+
+    solar_logg = 4.437  # [cgs]
+    return np.log10(np.asarray(mass) / np.asarray(radi) ** 2) + solar_logg
+
+
+def retr_albg(
+    amplplanrefl: float | np.ndarray,
+    radicomp: float | np.ndarray,
+    smax: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the planetary geometric albedo from reflected light amplitude."""
+
+    from .util import retr_factconv
+
+    au_to_earth_radius = retr_factconv()['asre']
+    return np.asarray(amplplanrefl) * (np.asarray(smax) / np.asarray(radicomp) * au_to_earth_radius) ** 2
+
+
+def retr_imfa(
+    cosi: float | np.ndarray,
+    rs2a: float | np.ndarray,
+    ecce: float | np.ndarray = 0.0,
+    sinw: float | np.ndarray = 0.0,
+) -> float | np.ndarray:
+    """Return the transit impact parameter."""
+
+    return (
+        np.asarray(cosi)
+        / np.asarray(rs2a)
+        * (1.0 - np.asarray(ecce) ** 2)
+        / (1.0 + np.asarray(ecce) * np.asarray(sinw))
+    )
+
+
+def retr_deptbeam(
+    peri: float | np.ndarray,
+    massstar: float | np.ndarray,
+    masscomp: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the Doppler beaming photometric amplitude in parts per thousand."""
+
+    beaming_constant = 2.8  # [ppt]
+    return (
+        beaming_constant
+        * np.asarray(peri) ** (-1.0 / 3.0)
+        * (np.asarray(massstar) + np.asarray(masscomp)) ** (-2.0 / 3.0)
+        * np.asarray(masscomp)
+    )  # [ppt]
+
+
+def retr_deptelli(
+    peri: float | np.ndarray,
+    densstar: float | np.ndarray,
+    massstar: float | np.ndarray,
+    masscomp: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the ellipsoidal variation photometric amplitude in parts per thousand."""
+
+    ellipsoidal_constant = 18.9  # [ppt]
+    return (
+        ellipsoidal_constant
+        * np.asarray(peri) ** (-2.0)
+        / np.asarray(densstar)
+        * (1.0 / (1.0 + np.asarray(massstar) / np.asarray(masscomp)))
+    )  # [ppt]
+
+
+def retr_alphelli(
+    linear_limb_darkening: float | np.ndarray,
+    gravity_darkening: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the gravity and limb darkening factor for ellipsoidal variations."""
+
+    u = np.asarray(linear_limb_darkening)
+    g = np.asarray(gravity_darkening)
+    return 0.15 * (15.0 + u) * (1.0 + g) / (3.0 - u)
+
+
+def retr_tmptplandayynigh(
+    tmptirra: float | np.ndarray,
+    epsi: float | np.ndarray = 0.1,
+) -> tuple[float | np.ndarray, float | np.ndarray]:
+    """Estimate the dayside and nightside planetary temperatures in Kelvin."""
+
+    tmptdayy = np.asarray(tmptirra) * (2.0 / 3.0 - 5.0 / 12.0 * np.asarray(epsi)) ** 0.25  # [K]
+    tmptnigh = np.asarray(tmptirra) * (np.asarray(epsi) / 4.0) ** 0.25  # [K]
+    return tmptdayy, tmptnigh
+
+
+def retr_esmm(
+    tmptplanequi: float | np.ndarray,
+    tmptstar: float | np.ndarray,
+    radicomp: float | np.ndarray,
+    radistar: float | np.ndarray,
+    kmag: float | np.ndarray,
+    recirculation_efficiency: float = 0.1,
+) -> float | np.ndarray:
+    """Calculate the Emission Spectroscopy Metric (Kempton et al. 2018)."""
+
+    from .spectral import blackbody_flux_wavelength
+    from .util import retr_factconv
+
+    tmptplanirra = np.asarray(tmptplanequi) * np.sqrt(2.0)  # [K]
+    tmptplandayy, _ = retr_tmptplandayynigh(tmptplanirra, recirculation_efficiency)
+    solar_to_earth_radius = retr_factconv()["rsre"]
+    radius_ratio = np.asarray(radicomp) / (np.asarray(radistar) * solar_to_earth_radius)
+    flux_ratio = blackbody_flux_wavelength(tmptplandayy, 7.5) / blackbody_flux_wavelength(tmptstar, 7.5)
+    scale_factor = 1.1e3
+    return scale_factor * flux_ratio * radius_ratio**2 * 10.0 ** (-np.asarray(kmag) / 5.0)
+
+
+def keplerian_semi_amplitude(
+    period_days: float | np.ndarray | None = None,
+    stellar_mass_solar: float | np.ndarray | None = None,
+    companion_mass_solar: float | np.ndarray | None = None,
+    inclination_degrees: float | np.ndarray = 90.0,
+    eccentricity: float | np.ndarray = 0.0,
+    *,
+    pericomp: float | np.ndarray | None = None,
+    massstar: float | np.ndarray | None = None,
+    masscomp: float | np.ndarray | None = None,
+    inclcomp: float | np.ndarray | None = None,
+    eccecomp: float | np.ndarray | None = None,
+) -> float | np.ndarray:
+    """Calculate the Keplerian radial velocity semi-amplitude in m/s."""
+
+    if period_days is None and pericomp is not None:
+        period_days = pericomp
+    if stellar_mass_solar is None and massstar is not None:
+        stellar_mass_solar = massstar
+    if companion_mass_solar is None and masscomp is not None:
+        companion_mass_solar = masscomp
+    if inclcomp is not None:
+        inclination_degrees = inclcomp
+    if eccecomp is not None:
+        eccentricity = eccecomp
+
+    gravitational_constant = 6.67430e-11  # [m^3 / (kg s^2)]
+    solar_mass_kg = 1.98847e30  # [kg]
+    seconds_per_day = 86400.0  # [s / day]
+
+    period_seconds = np.asarray(period_days, dtype=float) * seconds_per_day  # [s]
+    mass_star_kg = np.asarray(stellar_mass_solar, dtype=float) * solar_mass_kg  # [kg]
+    mass_comp_kg = np.asarray(companion_mass_solar, dtype=float) * solar_mass_kg  # [kg]
+    inclination_radians = np.deg2rad(np.asarray(inclination_degrees, dtype=float))
+    ecc = np.asarray(eccentricity, dtype=float)
+
+    semi_amplitude = (
+        (2.0 * np.pi * gravitational_constant / period_seconds) ** (1.0 / 3.0)
+        * mass_comp_kg
+        * np.sin(inclination_radians)
+        / (mass_star_kg + mass_comp_kg) ** (2.0 / 3.0)
+        / np.sqrt(np.maximum(1.0 - ecc**2, 1e-12))
+    )  # [m / s]
+    if np.ndim(semi_amplitude) == 0:
+        return float(semi_amplitude)
+    return semi_amplitude
+
+
+def keplerian_orbit_radial_velocity(
+    time: np.ndarray,
+    epoch_transit_days: float | np.ndarray | None = None,
+    period_days: float | np.ndarray | None = None,
+    companion_mass_solar: float | np.ndarray | None = None,
+    stellar_mass_solar: float | np.ndarray | None = None,
+    inclination_degrees: float | np.ndarray = 90.0,
+    eccentricity: float | np.ndarray = 0.0,
+    argument_periastron_degrees: float | np.ndarray = 90.0,
+    *,
+    epocmtracomp: float | np.ndarray | None = None,
+    pericomp: float | np.ndarray | None = None,
+    masscomp: float | np.ndarray | None = None,
+    massstar: float | np.ndarray | None = None,
+    inclcomp: float | np.ndarray | None = None,
+    eccecomp: float | np.ndarray | None = None,
+    arpacomp: float | np.ndarray | None = None,
+) -> np.ndarray:
+    """Calculate Keplerian stellar radial velocity from orbital transit parameters."""
+
+    if epoch_transit_days is None and epocmtracomp is not None:
+        epoch_transit_days = epocmtracomp
+    if period_days is None and pericomp is not None:
+        period_days = pericomp
+    if companion_mass_solar is None and masscomp is not None:
+        companion_mass_solar = masscomp
+    if stellar_mass_solar is None and massstar is not None:
+        stellar_mass_solar = massstar
+    if inclcomp is not None:
+        inclination_degrees = inclcomp
+    if eccecomp is not None:
+        eccentricity = eccecomp
+    if arpacomp is not None:
+        argument_periastron_degrees = arpacomp
+
+    arg_periastron_rad = np.deg2rad(np.asarray(argument_periastron_degrees, dtype=float))
+    true_anomaly_transit = np.pi / 2.0 - arg_periastron_rad
+    ecc = np.asarray(eccentricity, dtype=float)
+    eccentric_anomaly_transit = 2.0 * np.arctan2(
+        np.sqrt(np.maximum(1.0 - ecc, 0.0)) * np.sin(true_anomaly_transit / 2.0),
+        np.sqrt(1.0 + ecc) * np.cos(true_anomaly_transit / 2.0),
+    )
+    mean_anomaly_transit = eccentric_anomaly_transit - ecc * np.sin(eccentric_anomaly_transit)
+
+    semi_amplitude = keplerian_semi_amplitude(
+        period_days,
+        stellar_mass_solar,
+        companion_mass_solar,
+        inclination_degrees,
+        eccentricity,
+    )
+    return keplerian_radial_velocity(
+        time,
+        period_days,
+        semi_amplitude,
+        ecc,
+        arg_periastron_rad,
+        mean_anomaly_transit,
+        epoch_transit_days,
+    )
+
+
+def retr_radifrommass(
+    mass_earth: float | np.ndarray,
+    strgtype: str = "mine",
+) -> float | np.ndarray:
+    """Estimate planetary radius in Earth radii from mass in Earth masses."""
+
+    if strgtype != "mine":
+        raise ValueError(f"Unsupported radius-mass model {strgtype!r}.")
+
+    mass_arr = np.asarray(mass_earth, dtype=float)
+    radius_arr = np.empty_like(mass_arr)
+
+    mask1 = mass_arr <= 2.0
+    radius_arr[mask1] = mass_arr[mask1] ** 0.28
+
+    mask2 = (mass_arr > 2.0) & (mass_arr < 130.0)
+    radius_arr[mask2] = 4.48 * (mass_arr[mask2] / 20.0) ** 0.57
+
+    mask3 = (mass_arr >= 130.0) & (mass_arr < 2.66e4)
+    radius_arr[mask3] = 10.1 * (mass_arr[mask3] / 1e5) ** (-0.04)
+
+    mask4 = mass_arr >= 2.66e4
+    radius_arr[mask4] = 20.0 * (mass_arr[mask4] / 5e4) ** 0.88
+
+    if mass_arr.ndim == 0:
+        return float(radius_arr)
+    return radius_arr
+
+
+def retr_reso(
+    listperi: np.ndarray,
+    maxmordr: int = 10,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Find period ratios and closest integer orbital resonances."""
+
+    periods = np.asarray(listperi, dtype=float)
+    if periods.ndim == 1:
+        periods = periods[None, :]
+    if (periods <= 0.0).any() or not np.isfinite(periods).all():
+        raise ValueError("Periods must be finite and positive.")
+
+    numbsamp, numbcomp = periods.shape
+    listratiperi = np.zeros((numbsamp, numbcomp, numbcomp), dtype=float)
+    intgreso = np.zeros((numbcomp, numbcomp, 2), dtype=int)
+
+    for j in range(numbcomp):
+        for jj in range(numbcomp):
+            if j >= jj:
+                continue
+
+            ratio = periods[:, j] / periods[:, jj]
+            ratio_ordered = np.where(ratio < 1.0, 1.0 / ratio, ratio)
+            listratiperi[:, j, jj] = ratio_ordered
+
+            minmdiff = 1e100
+            best_reso = (1, 1)
+            for a in range(1, maxmordr):
+                for aa in range(1, maxmordr):
+                    diff = np.mean(np.abs(float(a) / aa - ratio_ordered))
+                    if diff < minmdiff:
+                        minmdiff = diff
+                        best_reso = (a, aa)
+            intgreso[j, jj, :] = best_reso
+
+    return intgreso, listratiperi
+
+
+def retr_liststrgcomp(number_companions: int) -> np.ndarray:
+    """Return standard lowercase letter labels for exoplanet companions."""
+
+    labels = ["b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"]
+    return np.array(labels[:number_companions])
+
+
+def retr_listcolrcomp(number_companions: int) -> np.ndarray:
+    """Return standard colors for exoplanet companions."""
+
+    colors = ["magenta", "orange", "red", "green", "purple", "cyan"]
+    return np.array(colors[:number_companions])
+
+
+retr_rvelsema = keplerian_semi_amplitude
+retr_rvel = keplerian_orbit_radial_velocity

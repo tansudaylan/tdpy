@@ -1506,6 +1506,7 @@ def retr_factconv():
     
     # Astronomical Unit in Solar radius
     dictfact['aurs'] = 215.
+    dictfact['asre'] = dictfact['aurs'] * dictfact['rsre']
     
     # Astronomical Unit in kilometers
     dictfact['aukm'] = 149597870700
@@ -3983,6 +3984,31 @@ def retr_psfn(gdat, psfp, indxenertemp, thisangl, psfntype, binsoaxi=None, oaxit
     return psfn
 
 
+def retr_psfnwdth(psfn, arryangl, frac=0.5):
+    """Return radial angular widths where each PSF reaches a fraction of peak."""
+
+    psfn = np.asarray(psfn)
+    arryangl = np.asarray(arryangl)
+    if psfn.ndim != 3:
+        raise ValueError("psfn must have energy, angle, and event-class axes")
+    if arryangl.ndim != 1 or arryangl.size != psfn.shape[1]:
+        raise ValueError("arryangl must match the PSF angle axis")
+
+    widths = np.zeros((psfn.shape[0], psfn.shape[2]))
+    for energy_index in range(psfn.shape[0]):
+        for event_class_index in range(psfn.shape[2]):
+            profile = psfn[energy_index, :, event_class_index]
+            profile_order = np.argsort(profile)
+            threshold = max(frac * np.amax(profile), np.amin(profile))
+            if np.amin(profile) <= threshold <= np.amax(profile):
+                widths[energy_index, event_class_index] = sp.interpolate.interp1d(
+                    profile[profile_order],
+                    arryangl[profile_order],
+                    fill_value="extrapolate",
+                )(threshold)
+    return widths
+
+
 def retr_psfpferm(gdat, gmod=None):
    
     if hasattr(gdat, 'exproaxitype'):
@@ -4955,3 +4981,48 @@ def retr_dict(listname):
         thisdict[name] = [[], []]
     
     return thisdict
+
+
+from .exoplanet import (
+    fold_tser,
+    keplerian_orbit_radial_velocity,
+    keplerian_semi_amplitude,
+    relative_flux_from_delta_magnitude,
+    retr_albg,
+    retr_alphelli,
+    retr_brgtlmdk,
+    retr_deptbeam,
+    retr_deptelli,
+    retr_duratranfull,
+    retr_duratrantotl,
+    retr_esmm,
+    retr_imfa,
+    retr_lcurmodl_flarsing,
+    retr_listcolrcomp,
+    retr_liststrgcomp,
+    retr_logg,
+    retr_perikepl,
+    retr_radifrommass,
+    retr_radihill,
+    retr_radiroch,
+    retr_reso,
+    retr_rflxfromdmag,
+    retr_rs2a,
+    retr_rsmacomp,
+    retr_rvel,
+    retr_rvelsema,
+    retr_scalheig,
+    retr_smaxkepl,
+    retr_tmptplandayynigh,
+    retr_tsmm,
+    retr_vesc,
+    stellar_limb_darkened_brightness,
+)
+from .spectral import (
+    blackbody_flux_energy,
+    blackbody_flux_wavelength,
+    blackbody_spectral_flux,
+    retr_fluxspecbbod,
+    retr_fluxspecbbodener,
+    retr_fluxspecbbodwlen,
+)

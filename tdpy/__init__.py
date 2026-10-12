@@ -14,10 +14,12 @@ if not hasattr(np, 'trapz'):
     np.trapz = np.trapezoid
 
 from .astro import *
+from .exoplanet import *
 from .numerics import *
 from .pandeia import *
 from .plotting import *
 from .serialization import *
+from .spectral import *
 from .tess import *
 from .paths import RepositoryPaths, get_data_path, get_repository_path, get_visuals_path, open_narr
 

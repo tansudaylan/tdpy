@@ -21,6 +21,16 @@ def test_kernel_functions_match_nicomedia_scalar():
     assert np.allclose(tdpy.retr_doubking(scaldevi, frac, sigc, gamc, sigt, gamt), nicomedia.retr_doubking(scaldevi, frac, sigc, gamc, sigt, gamt))
 
 
+def test_psf_width_interpolates_each_energy_and_event_class():
+    angles = np.linspace(0.0, 4.0, 401)
+    sigmas = np.array([[0.5, 1.0], [1.5, 2.0]])
+    profiles = np.exp(-angles[None, :, None] ** 2 / (2.0 * sigmas[:, None, :] ** 2))
+
+    widths = tdpy.retr_psfnwdth(profiles, angles)
+
+    np.testing.assert_allclose(widths, sigmas * np.sqrt(2.0 * np.log(2.0)), atol=1e-4)
+
+
 def test_kernel_functions_match_nicomedia_broadcast():
     scaldevi = np.linspace(0.0, 2.0, 5)[None, :, None]
     frac = np.array([0.25, 0.75])[:, None, None]
