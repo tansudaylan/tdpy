@@ -12,24 +12,41 @@ import sys
 import warnings
 
 # packages whose own numerical and plotting warnings are silenced together with their printing
-LISTNAMEPACK = ['abydos', 'aspendos', 'assos', 'chalcedon', 'darkinferno', 'ephesos', 'gordion', 'hattusa', 'lygos',
-                'mejiro', 'miletos', 'nicomedia', 'pcat', 'pergamon', 'sardis', 'tdpy', 'termessos', 'troia']
+LISTNAMEPACK = [
+    "abydos",
+    "aspendos",
+    "assos",
+    "chalcedon",
+    "darkinferno",
+    "ephesos",
+    "gordion",
+    "hattusa",
+    "lygos",
+    "mejiro",
+    "miletos",
+    "nicomedia",
+    "pcat",
+    "pergamon",
+    "sardis",
+    "tdpy",
+    "troia",
+]
 
 
 def retr_boolverb():
     """Return True when console output is enabled through TDPY_VERBOSITY."""
     try:
-        return int(os.environ.get('TDPY_VERBOSITY', '0').strip()) > 0
+        return int(os.environ.get("TDPY_VERBOSITY", "0").strip()) > 0
     except ValueError:
         return False
 
 
 if not retr_boolverb():
-    warnings.filterwarnings('ignore', module=r'(%s)(\.|$)' % '|'.join(LISTNAMEPACK))
+    warnings.filterwarnings("ignore", module=r"(%s)(\.|$)" % "|".join(LISTNAMEPACK))
     # deprecation notices from dependencies concern maintenance, not results
     for category in (DeprecationWarning, PendingDeprecationWarning, FutureWarning):
-        warnings.filterwarnings('ignore', category=category)
-    warnings.filterwarnings('ignore', message=r'.*deprecated.*')
+        warnings.filterwarnings("ignore", category=category)
+    warnings.filterwarnings("ignore", message=r".*deprecated.*")
 
 
 def print(*args, **kwargs):
