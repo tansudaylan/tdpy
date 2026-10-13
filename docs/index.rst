@@ -1,9 +1,10 @@
 TDpy
 ====
 
-TDpy is the shared numerical, plotting, serialization, catalog, and workflow
-utility library used across this astrophysics software ecosystem. It is the
-canonical home for reusable helpers; posterior sampling is provided by PCAT.
+I use TDpy for numerical, plotting, serialization, catalog, and workflow
+helpers that recur across my astrophysics projects. A shared implementation
+means an analysis can spend less time reimplementing a weighted quantile and
+more time asking what the data say. Posterior sampling is provided by PCAT.
 
 .. toctree::
    :maxdepth: 2

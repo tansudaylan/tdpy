@@ -2,31 +2,27 @@
 
 ## Purpose
 
-TDpy collects the numerical, plotting, and path utilities used across astrophysical analyses. It helps scripts and notebooks handle scientific arrays, annotate source catalogs, and find data and output directories without depending on one workstation's filesystem.
+I use TDpy for the small, recurring jobs that sit between an astrophysical idea and a result I can inspect. It handles numerical arrays, plots, catalog annotations, and data paths. I keep the shared helpers here so a new analysis can spend its lines on physics rather than reimplementing a weighted quantile.
 
-Use the functions directly in a short script or as building blocks in a larger analysis.
+Use a function in a short calculation, or let the larger analysis packages call it. The same numerical definitions should apply either way.
 
 ## What it provides
 
-The library includes utilities for:
+The shared tools cover:
 
-- environment-based filesystem and data-path normalization;
-- reusable plots for population and catalog analyses;
-- self-contained interactive HTML figures through `tdpy.plotting.save_bokeh_html` and the optional `bokeh` extra;
-- numerical support for array handling, weighted medians and quantiles, and quantiles from gridded probability densities;
-- light-weight visualization utilities used across time-domain and catalog workflows;
-- reproducible output layout for figures and intermediate diagnostic products.
+- environment-based filesystem and data-path normalization
+- reusable plots for population and catalog analyses
+- self-contained interactive HTML figures through `tdpy.plotting.save_bokeh_html` and the optional `bokeh` extra
+- numerical support for array handling, weighted medians and quantiles, and quantiles from gridded probability densities
+- lightweight visualization utilities used across time-domain and catalog workflows
+- consistent output directories for figures and intermediate calculations
 
 ## Scientific utilities
 
-- configure portable data and output paths;
-- annotate source catalogs and visualize population parameters;
-- inspect intermediate analysis states with plots;
-- apply general numerical transforms used in astronomical analyses;
-- build periodic-event timing and overlap reports with `tdpy.astro`;
-- calculate bulk densities, Roche distances, escape velocities, equilibrium and irradiation temperatures, interval contrasts, and atmosphere forecasts with `tdpy.exoplanet`;
-- construct normalized NIRSpec calculations with `tdpy.pandeia`;
-- evaluate normalized line profiles, power-law/curved/cutoff continua, blackbody flux and luminosity, and AXIS transmission with `tdpy.spectral`;
+- build periodic-event timing and overlap reports with `tdpy.astro`
+- calculate bulk densities, Roche distances, escape velocities, equilibrium and irradiation temperatures, interval contrasts, and atmosphere forecasts with `tdpy.exoplanet`
+- construct normalized NIRSpec calculations with `tdpy.pandeia`
+- evaluate normalized line profiles, power-law/curved/cutoff continua, blackbody flux and luminosity, and AXIS transmission with `tdpy.spectral`
 - run labeled, fail-fast command sequences with `tdpy.workflow`.
 
 ## Profiles and catalog access
@@ -48,7 +44,7 @@ Catalog adapters and population synthesis now belong to Pergamon. The original M
 
 ## Installation
 
-The repository supports a standard editable install:
+Install from the repository root:
 
 ```bash
 cd tdpy
@@ -72,19 +68,13 @@ The synthetic example annotates a three-source catalog on a Gaussian image:
 python examples/catalog_overlay_diagnostic.py --typefileplot png
 ```
 
-![Synthetic catalog overlay diagnostic](examples/catalog_overlay_diagnostic.png)
+![Synthetic catalog overlay](examples/catalog_overlay_diagnostic.png)
 
 This produces a two-panel figure showing a deterministic Gaussian source field before and after catalog annotation. The three sources have mean magnitudes of 11, 12, and 13 mag. Two are isolated and one is labeled as blended. These are clearly labeled simulated inputs rather than observational evidence.
 
 ## Catalog annotation
 
-The calculation contains:
-
-- input: synthetic catalog positions and magnitudes;
-- transformation: catalog overlay plotting and annotation placement;
-- output: a saved figure showing the diagnostic field view.
-
-The side-by-side field views expose the catalog positions, magnitudes, blend labels, and annotation placement.
+Compare the plain image with the annotated view to inspect the supplied positions, magnitudes, blend labels, and label placement. That makes it easier to catch an annotation that has wandered away from its source.
 
 ## Core plotting utilities
 
