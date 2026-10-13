@@ -1,7 +1,21 @@
 import numpy as np
 import pytest
 
-from tdpy.population import subset_population
+from tdpy.population import partition_classified_population, subset_population
+
+
+def test_partition_classified_population():
+    relevant = np.array([0, 1, 2])
+    irrelevant = np.array([3, 4, 5])
+    positive = np.array([1, 2, 3])
+    negative = np.array([0, 4, 5])
+
+    parts = partition_classified_population(relevant, irrelevant, positive, negative)
+
+    np.testing.assert_array_equal(parts["trpo"], [1, 2])
+    np.testing.assert_array_equal(parts["trne"], [4, 5])
+    np.testing.assert_array_equal(parts["flpo"], [3])
+    np.testing.assert_array_equal(parts["flne"], [0])
 
 
 def test_subset_population_copies_values_units_and_metadata():

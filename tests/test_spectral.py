@@ -116,3 +116,40 @@ def test_band_energy_grid_and_bolometric_luminosity():
     trans = instrument_transmission("AXIS", np.array([100.0, 500.0, 15000.0]))
     np.testing.assert_array_equal(trans, [0.0, 1.0, 0.0])
     assert retr_functran("AXIS", 1000.0) == 1.0
+
+    from tdpy.spectral import integrate_blackbody_flux_wavelength
+    flux_tess = integrate_blackbody_flux_wavelength(5778.0, 0.6, 1.0)
+    assert flux_tess > 0.0
+    # Higher temperature emits more flux in optical band
+    assert integrate_blackbody_flux_wavelength(9000.0, 0.6, 1.0) > flux_tess
+
+
+def test_evaluate_spectral_model():
+    from tdpy.spectral import evaluate_spectral_model, retr_spec
+
+    class MockGdat:
+        def __init__(self):
+            self.numbener = 3
+            self.enerpivt = 2.0
+            self.factlogtenerpivt = np.log10(np.array([1.0, 2.0, 4.0]) / 2.0)
+            self.indxenerpivt = 1
+            self.indxener = np.array([0, 1, 2])
+            class MockBctr:
+                ener = np.array([1.0, 2.0, 4.0])
+            self.bctrpara = MockBctr()
+
+    gdat = MockGdat()
+    flux = np.array([10.0, 20.0])
+
+    # Power law
+    spec_powr = evaluate_spectral_model(gdat, flux, sind=1.0, spectype="powr")
+    assert spec_powr.shape == (3, 2)
+    # Energy grid is [1.0, 2.0, 4.0], enerpivt is 2.0, sind is 1.0 -> (E/2)^(-1)
+    np.testing.assert_allclose(spec_powr[1], flux)
+    np.testing.assert_allclose(spec_powr[0], flux * 2.0)
+    np.testing.assert_allclose(spec_powr[2], flux * 0.5)
+
+    # Line profile (gaus)
+    spec_gaus = retr_spec(gdat, flux, elin=2.0, sigm=1.0, spectype="gaus")
+    assert spec_gaus.shape == (3, 2)
+    assert spec_gaus[1, 0] > spec_gaus[0, 0]

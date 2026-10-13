@@ -197,6 +197,24 @@ def test_retr_lcurmodl_flarsing_produces_fred_profile():
     assert flare[time > 2.0].max() < 0.001
 
 
+def test_evaluate_davenport_flare_and_area():
+    from tdpy.exoplanet import davenport_flare_area, evaluate_davenport_flare
+
+    time = np.linspace(-2.0, 5.0, 1000)
+    flare = evaluate_davenport_flare(time, peak_time=1.0, fwhm=0.5, amplitude=0.04)
+
+    assert flare.shape == time.shape
+    peak_index = np.argmax(flare)
+    assert time[peak_index] == pytest.approx(1.0, abs=0.01)
+    assert flare[peak_index] == pytest.approx(0.04, rel=1e-2)
+    # Outside flare domain: zero
+    assert flare[time < 0.4].max() == 0.0
+
+    area = davenport_flare_area(fwhm=0.5, amplitude=0.04)
+    # Area = 0.5 * 0.04 * 1.826884856...
+    assert area == pytest.approx(0.02 * 1.8268848560866364)
+
+
 def test_planetary_metric_and_orbital_helpers():
     # escape velocity
     assert retr_vesc(1.0, 1.0) == pytest.approx(11.2)
@@ -255,6 +273,11 @@ def test_planetary_metric_and_orbital_helpers():
     assert radii[0] == pytest.approx(1.0)
     assert radii[1] > radii[0]
     assert np.all(radii > 0.0)
+
+    from tdpy.exoplanet import retr_massfromradi
+    masses = retr_massfromradi(radii[:2])
+    assert masses[0] == pytest.approx(1.0, rel=1e-3)
+    assert masses[1] == pytest.approx(10.0, rel=1e-3)
 
     # albedo
     albedo = retr_albg(1e-4, 1.0, 0.05)

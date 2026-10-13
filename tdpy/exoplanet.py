@@ -746,6 +746,60 @@ def retr_lcurmodl_flarsing(
     return lcur
 
 
+def evaluate_davenport_flare(
+    time: float | np.ndarray,
+    peak_time: float,
+    fwhm: float,
+    amplitude: float,
+) -> float | np.ndarray:
+    """Evaluate the classical Davenport et al. (2014) stellar flare model.
+
+    Parameters
+    ----------
+    time : float or np.ndarray
+        Time array to evaluate the flare model over.
+    peak_time : float
+        Time of peak flare flux.
+    fwhm : float
+        Full width at half maximum of the flare in units of time.
+    amplitude : float
+        Relative peak flare amplitude.
+
+    Returns
+    -------
+    float or np.ndarray
+        Flare flux model on the time grid (zero outside flare).
+    """
+    t = np.asarray(time, dtype=float)
+    phase = (t - peak_time) / fwhm
+    rise = (
+        1.00000
+        + 1.94053 * phase
+        - 0.175084 * phase**2
+        - 2.24588 * phase**3
+        - 1.12498 * phase**4
+    )
+    decay = 0.689008 * np.exp(-1.60053 * phase) + 0.302963 * np.exp(-0.278318 * phase)
+    shape = np.where(phase < -1.0, 0.0, np.where(phase <= 0.0, rise, decay))
+    shape = np.clip(shape, 0.0, None)
+    flux = shape * np.abs(amplitude)
+    if np.ndim(time) == 0:
+        return float(flux)
+    return flux
+
+
+def davenport_flare_area(
+    fwhm: float | np.ndarray,
+    amplitude: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return the analytical integrated area of a Davenport et al. (2014) flare."""
+    area_factor = 1.8268848560866364
+    area = np.abs(amplitude) * np.abs(fwhm) * area_factor
+    if np.ndim(amplitude) == 0 and np.ndim(fwhm) == 0:
+        return float(area)
+    return area
+
+
 def retr_smaxkepl(
     peri: float | np.ndarray,
     masstotl: float | np.ndarray,
@@ -1183,6 +1237,35 @@ def retr_radifrommass(
     return radius_arr
 
 
+def retr_massfromradi(
+    radius_earth: float | np.ndarray,
+    strgtype: str = "mine",
+) -> float | np.ndarray:
+    """Estimate planetary mass in Earth masses from radius in Earth radii."""
+
+    if strgtype != "mine":
+        raise ValueError(f"Unsupported radius-mass model {strgtype!r}.")
+
+    radius_arr = np.asarray(radius_earth, dtype=float)
+    mass_arr = np.empty_like(radius_arr)
+
+    r_break1 = 2.0 ** 0.28  # ~1.21419
+    r_break2 = 4.48 * (130.0 / 20.0) ** 0.57  # ~13.013
+
+    mask1 = radius_arr <= r_break1
+    mass_arr[mask1] = radius_arr[mask1] ** (1.0 / 0.28)
+
+    mask2 = (radius_arr > r_break1) & (radius_arr <= r_break2)
+    mass_arr[mask2] = 20.0 * (radius_arr[mask2] / 4.48) ** (1.0 / 0.57)
+
+    mask3 = radius_arr > r_break2
+    mass_arr[mask3] = 5e4 * (radius_arr[mask3] / 20.0) ** (1.0 / 0.88)
+
+    if radius_arr.ndim == 0:
+        return float(mass_arr)
+    return mass_arr
+
+
 def retr_reso(
     listperi: np.ndarray,
     maxmordr: int = 10,
@@ -1259,17 +1342,14 @@ def companion_flux_dilution(
     number_wavelengths: int = 50,
 ) -> float:
     """Calculate photometric dilution factor 1 - F_target / (F_target + F_companion) across a bandpass."""
-    from .spectral import blackbody_flux_wavelength
+    from .spectral import integrate_blackbody_flux_wavelength
 
-    binswlen = np.linspace(wavelength_min_microns, wavelength_max_microns, number_wavelengths)
-    meanwlen = 0.5 * (binswlen[1:] + binswlen[:-1])
-    diffwlen = 0.5 * (binswlen[1:] - binswlen[:-1])
-
-    fluxspectarg = blackbody_flux_wavelength(target_temperature_k, meanwlen)
-    fluxtarg = float(np.sum(diffwlen * fluxspectarg))
-
-    fluxspeccomp = blackbody_flux_wavelength(companion_temperature_k, meanwlen)
-    fluxcomp = float(np.sum(diffwlen * fluxspeccomp))
+    fluxtarg = integrate_blackbody_flux_wavelength(
+        target_temperature_k, wavelength_min_microns, wavelength_max_microns, number_wavelengths
+    )
+    fluxcomp = integrate_blackbody_flux_wavelength(
+        companion_temperature_k, wavelength_min_microns, wavelength_max_microns, number_wavelengths
+    )
 
     return 1.0 - fluxtarg / (fluxtarg + fluxcomp)
 

@@ -4508,59 +4508,6 @@ def plot_fermsmth():
         plot_maps(path, mapssmthgaus, minmlgal=minmlgal, maxmlgal=maxmlgal, minmbgal=minmbgal, maxmbgal=maxmbgal)
 
 
-def icdf_self(paraunit, minmpara, maxmpara):
-    para = (maxmpara - minmpara) * paraunit + minmpara
-    return para
-
-
-def icdf_logt(paraunit, minmpara, maxmpara):
-    
-    para = minmpara * np.exp(paraunit * np.log(maxmpara / minmpara))
-    
-    return para
-
-
-def icdf_atan(paraunit, minmpara, maxmpara):
-    para = tan((arctan(maxmpara) - arctan(minmpara)) * paraunit + arctan(minmpara))
-    return para
-
-
-def icdf_gaus(cdfn, meanpara, stdvpara):
-    
-    para = meanpara + stdvpara * np.sqrt(2) * sp.special.erfinv(2. * cdfn - 1.)
-
-    return para
-
-
-def cdfn_self(para, minmpara, maxmpara):
-    paraunit = (para - minmpara) / (maxmpara - minmpara)
-    return paraunit
-
-
-def cdfn_logt(para, minmpara, maxmpara):
-    paraunit = np.log(para / minmpara) / np.log(maxmpara / minmpara)
-    return paraunit
-
-
-def cdfn_atan(para, minmpara, maxmpara):
-    paraunit = (arctan(para) - arctan(minmpara)) / (arctan(maxmpara) - arctan(minmpara))
-    return paraunit
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def retr_timeunitdays(time):
     
     if time < 0:
@@ -4995,6 +4942,8 @@ def retr_dict(listname):
 
 from .exoplanet import (
     companion_flux_dilution,
+    davenport_flare_area,
+    evaluate_davenport_flare,
     fold_tser,
     keplerian_orbit_radial_velocity,
     keplerian_orbital_speed,
@@ -5018,6 +4967,7 @@ from .exoplanet import (
     retr_listepoctran,
     retr_liststrgcomp,
     retr_logg,
+    retr_massfromradi,
     retr_perikepl,
     retr_radifrommass,
     retr_radihill,
@@ -5048,15 +4998,43 @@ from .spectral import (
     blackbody_flux_wavelength,
     blackbody_spectral_flux,
     bolometric_blackbody_luminosity,
+    evaluate_spectral_model,
     instrument_transmission,
+    integrate_blackbody_flux_wavelength,
     retr_blimener,
     retr_fluxbolobbod,
     retr_fluxspecbbod,
     retr_fluxspecbbodener,
     retr_fluxspecbbodwlen,
     retr_functran,
+    retr_spec,
 )
 from .numerics import (
+    cdfn_dexp,
+    cdfn_expo,
+    cdfn_gaus,
+    cdfn_logt,
+    cdfn_self,
+    find_nearest,
+    find_nearest_index,
+    icdf_dexp,
+    icdf_expo,
+    icdf_gaus,
+    icdf_logt,
+    icdf_self,
+    pdfn_atan,
+    pdfn_dexp,
+    pdfn_dpow,
+    pdfn_expo,
+    pdfn_gaus,
+    pdfn_igam,
+    pdfn_lgau,
+    pdfn_lnor,
+    pdfn_logt,
+    pdfn_powr,
+    pdfn_self,
+    range_shift,
+    rescale_range,
     weighted_linear_regression,
     retr_mlikregr,
 )
@@ -5068,6 +5046,7 @@ from .tess import (
 )
 from .astro import (
     flux_from_magnitude,
+    format_equatorial_coordinates,
     instrument_zeropoint,
     magnitude_from_flux,
     photometric_noise,
@@ -5075,4 +5054,8 @@ from .astro import (
     retr_magtfromflux,
     retr_noisphot,
     retr_pntszero,
+)
+from .population import (
+    partition_classified_population,
+    subset_population,
 )

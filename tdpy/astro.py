@@ -645,6 +645,36 @@ def flux_from_magnitude(
 retr_fluxfrommagt = flux_from_magnitude
 
 
+def format_equatorial_coordinates(
+    ra_deg: float,
+    dec_deg: float,
+    precision: int = 0,
+) -> tuple[str, str]:
+    """Format decimal-degree coordinates as sexagesimal strings (hh:mm:ss, dd:mm:ss).
+
+    Parameters
+    ----------
+    ra_deg : float
+        Right ascension in degrees.
+    dec_deg : float
+        Declination in degrees.
+    precision : int, optional
+        Sub-second decimal precision (default 0).
+
+    Returns
+    -------
+    tuple of (str, str)
+        Right ascension string and declination string with leading zeros.
+    """
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+
+    coord = SkyCoord(ra=float(ra_deg) * u.deg, dec=float(dec_deg) * u.deg)
+    ra_str = coord.ra.to_string(unit=u.hour, sep=":", precision=precision, pad=True)
+    dec_str = coord.dec.to_string(unit=u.deg, sep=":", precision=precision, alwayssign=True, pad=True)
+    return ra_str, dec_str
+
+
 def photometric_noise(
     magnitude: float | np.ndarray,
     instrument: str = "TESS",

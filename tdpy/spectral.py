@@ -90,7 +90,7 @@ def evaluate_continuum_spectrum(
 
     energy = np.asarray(energy, dtype=float).reshape(-1)
     flux = np.atleast_1d(np.asarray(flux, dtype=float))
-    spectral_index = np.asarray(spectral_index, dtype=float)
+    spectral_index = np.atleast_1d(np.asarray(spectral_index, dtype=float))
     if profile == "powr":
         return flux[None, :] * (energy / reference_energy)[:, None] ** (
             -spectral_index[None, :]
@@ -99,13 +99,13 @@ def evaluate_continuum_spectrum(
         if log_energy_ratio is None:
             log_energy_ratio = np.log(energy / reference_energy)
         log_energy_ratio = np.asarray(log_energy_ratio, dtype=float).reshape(-1)
-        curvature = np.asarray(curvature, dtype=float)
+        curvature = np.atleast_1d(np.asarray(curvature, dtype=float))
         return flux[None, :] * energy[:, None] ** (
             -spectral_index[None, :]
             - log_energy_ratio[:, None] * curvature[None, :]
         )
     if profile == "expc":
-        cutoff_energy = np.asarray(cutoff_energy, dtype=float)
+        cutoff_energy = np.atleast_1d(np.asarray(cutoff_energy, dtype=float))
         return (
             flux[None, :]
             * (energy / reference_energy)[:, None] ** (-spectral_index[None, :])
@@ -137,6 +137,38 @@ def blackbody_flux_wavelength(
         * inv_expm1
     )  # [W / m^2 / m]
     return flux * 1e-3  # [erg / s / cm^2 / micron]
+
+
+def integrate_blackbody_flux_wavelength(
+    temperature: float | np.ndarray,
+    wavelength_min_microns: float,
+    wavelength_max_microns: float,
+    number_wavelengths: int = 50,
+) -> float | np.ndarray:
+    """Integrate Planck blackbody spectral surface flux over a wavelength range in microns.
+
+    Parameters
+    ----------
+    temperature : float or np.ndarray
+        Blackbody temperature in Kelvin.
+    wavelength_min_microns : float
+        Lower wavelength bound in microns.
+    wavelength_max_microns : float
+        Upper wavelength bound in microns.
+    number_wavelengths : int, optional
+        Number of grid evaluation points (default 50).
+
+    Returns
+    -------
+    float or np.ndarray
+        Integrated surface flux in erg / s / cm^2.
+    """
+    wavelengths = np.linspace(wavelength_min_microns, wavelength_max_microns, number_wavelengths)
+    flux = blackbody_flux_wavelength(temperature, wavelengths)
+    integrated = np.trapz(flux, wavelengths, axis=-1 if np.ndim(flux) > 1 else 0)
+    if np.ndim(temperature) == 0:
+        return float(integrated)
+    return integrated
 
 
 def blackbody_flux_energy(
@@ -268,6 +300,125 @@ def instrument_transmission(
 retr_functran = instrument_transmission
 
 
+def evaluate_spectral_model(
+    gdat,
+    flux,
+    sind=None,
+    curv=None,
+    expc=None,
+    sindcolr=None,
+    elin=None,
+    edisintp=None,
+    sigm=None,
+    gamm=None,
+    frac=None,
+    skew=None,
+    spectype="powr",
+    plot=False,
+):
+    """Evaluate line, color, or continuum spectra across the energy grid of the experiment state."""
+    flux = np.atleast_1d(np.asarray(flux, dtype=float))
+    if getattr(gdat, "numbener", None) == 1:
+        return flux[None, :]
+
+    meanener = np.asarray(
+        getattr(gdat.bctrpara, "enerplot", gdat.bctrpara.ener) if plot else gdat.bctrpara.ener,
+        dtype=float,
+    )
+
+    if spectype in ("gaus", "voig", "edis", "pvoi", "lore", "sinc", "skew", "toph"):
+        if elin is None:
+            raise ValueError("elin is required for line spectra.")
+        elin = np.atleast_1d(np.asarray(elin, dtype=float))
+        if elin.size == 1 and flux.size > 1:
+            elin = np.full(flux.size, elin.item())
+        if elin.size != flux.size:
+            raise ValueError("elin must contain one center per flux value.")
+
+        def _line_param(val, name, require_pos=True):
+            if val is None:
+                return None
+            arr = np.atleast_1d(np.asarray(val, dtype=float))
+            if arr.size == 1 and flux.size > 1:
+                arr = np.full(flux.size, arr.item())
+            if arr.size != flux.size or not np.isfinite(arr).all():
+                raise ValueError(f"{name} must contain finite values, one per line.")
+            if require_pos and np.any(arr <= 0.0):
+                raise ValueError(f"{name} must contain positive values, one per line.")
+            return arr
+
+        if spectype == "edis":
+            if edisintp is None:
+                raise ValueError("edisintp is required for spectype='edis'.")
+            gaussian_width = _line_param(edisintp(elin), "edisintp(elin)")
+        elif spectype in ("gaus", "voig", "pvoi"):
+            if sigm is None:
+                raise ValueError("sigm is required for Gaussian-based lines.")
+            gaussian_width = _line_param(sigm, "sigm")
+        else:
+            gaussian_width = _line_param(sigm, "sigm") if sigm is not None else None
+
+        if spectype in ("lore", "voig", "pvoi"):
+            if gamm is None:
+                raise ValueError("gamm is required for Lorentzian-based lines.")
+            lorentz_width = _line_param(gamm, "gamm")
+        else:
+            lorentz_width = _line_param(gamm, "gamm") if gamm is not None else None
+
+        mixing_fraction = None
+        if spectype == "pvoi":
+            if frac is None:
+                raise ValueError("frac is required for spectype='pvoi'.")
+            mixing_fraction = _line_param(frac, "frac", require_pos=False)
+            if np.any((mixing_fraction < 0.0) | (mixing_fraction > 1.0)):
+                raise ValueError("frac must contain values between zero and one, one per line.")
+
+        skewness = _line_param(skew, "skew", require_pos=False) if skew is not None else None
+
+        return evaluate_line_profile(
+            meanener,
+            spectype,
+            flux,
+            elin,
+            gaussian_width=gaussian_width,
+            lorentz_width=lorentz_width,
+            mixing_fraction=mixing_fraction,
+            skewness=skewness,
+        )
+
+    if spectype == "colr":
+        if plot:
+            return np.zeros((meanener.size, flux.size))
+        if sindcolr is None:
+            raise ValueError("sindcolr is required for spectype='colr'.")
+        spec = np.zeros((meanener.size, flux.size))
+        indxener = np.arange(meanener.size) if plot else gdat.indxener
+        for i in indxener:
+            if i == gdat.indxenerpivt:
+                spec[i] = flux
+            else:
+                indxcolr = i if i < gdat.indxenerpivt else i - 1
+                if indxcolr >= len(sindcolr):
+                    indxcolr = len(sindcolr) - 1
+                spec[i] = flux * (meanener[i] / gdat.enerpivt) ** (-sindcolr[indxcolr])
+        return spec
+
+    if spectype in ("powr", "curv", "expc"):
+        return evaluate_continuum_spectrum(
+            meanener,
+            flux,
+            spectype,
+            gdat.enerpivt,
+            sind,
+            curvature=curv,
+            cutoff_energy=expc,
+            log_energy_ratio=getattr(gdat, "factlogtenerpivt", None),
+        )
+
+    raise ValueError(f"Unsupported spectype {spectype!r}.")
+
+
+retr_spec = evaluate_spectral_model
 retr_fluxspecbbodwlen = blackbody_flux_wavelength
 retr_fluxspecbbodener = blackbody_flux_energy
 retr_fluxspecbbod = blackbody_spectral_flux
@@ -280,11 +431,14 @@ __all__ = [
     "bolometric_blackbody_luminosity",
     "evaluate_continuum_spectrum",
     "evaluate_line_profile",
+    "evaluate_spectral_model",
     "instrument_transmission",
+    "integrate_blackbody_flux_wavelength",
     "retr_blimener",
     "retr_fluxbolobbod",
     "retr_fluxspecbbod",
     "retr_fluxspecbbodener",
     "retr_fluxspecbbodwlen",
     "retr_functran",
+    "retr_spec",
 ]

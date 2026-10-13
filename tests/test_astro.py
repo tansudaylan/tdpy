@@ -269,3 +269,15 @@ def test_instrument_zeropoints_and_flux_conversions():
     assert lsst_noise[0] == pytest.approx(0.5)
     assert lsst_noise[1] == pytest.approx(0.5 * 10.0 ** ((0.4 * 22.0 - 20.0) / 3.0))
     assert lsst_noise[2] == pytest.approx(1000.0)
+
+
+def test_format_equatorial_coordinates():
+    from tdpy.astro import format_equatorial_coordinates
+
+    ra_str, dec_str = format_equatorial_coordinates(0.0, -30.0)
+    assert ra_str == "00:00:00"
+    assert dec_str == "-30:00:00"
+
+    ra_str, dec_str = format_equatorial_coordinates(180.0, 45.0, precision=2)
+    assert ra_str == "12:00:00.00"
+    assert dec_str == "+45:00:00.00"

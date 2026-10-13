@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import numpy as np
 from scipy.special import erf, erfinv
-from scipy.stats import chi2, ncx2
+from scipy.stats import chi2, invgamma, ncx2
 
 
 def cdfn_self(value, minimum, maximum):
@@ -35,6 +35,141 @@ def cdfn_gaus(value, mean, standard_deviation):
 def icdf_gaus(probability, mean, standard_deviation):
     """Return the Gaussian quantile for a cumulative probability."""
     return mean + np.sqrt(2.0) * standard_deviation * erfinv(2.0 * probability - 1.0)
+
+
+def cdfn_expo(value, maximum, scale):
+    """Return the exponential cumulative probability."""
+    return (1.0 - np.exp(-value / scale)) / (1.0 - np.exp(-maximum / scale))
+
+
+def icdf_expo(probability, maximum, scale):
+    """Return the exponential quantile for a cumulative probability."""
+    return -scale * np.log(1.0 - probability * (1.0 - np.exp(-maximum / scale)))
+
+
+def cdfn_dexp(value, maximum, scale):
+    """Return the double-exponential cumulative probability."""
+    val = np.asarray(value)
+    if val.ndim == 0:
+        if val < 0.0:
+            return 0.5 * (1.0 - cdfn_expo(-val, maximum, scale))
+        return 0.5 * (1.0 + cdfn_expo(val, maximum, scale))
+    pos = val >= 0.0
+    res = np.empty_like(val, dtype=float)
+    res[pos] = 0.5 * (1.0 + cdfn_expo(val[pos], maximum, scale))
+    res[~pos] = 0.5 * (1.0 - cdfn_expo(-val[~pos], maximum, scale))
+    return res
+
+
+def icdf_dexp(probability, maximum, scale):
+    """Return the double-exponential quantile for a cumulative probability."""
+    prob = np.asarray(probability)
+    if prob.ndim == 0:
+        if prob < 0.5:
+            return -icdf_expo(1.0 - 2.0 * prob, maximum, scale)
+        return icdf_expo(2.0 * (prob - 0.5), maximum, scale)
+    res = np.empty_like(prob, dtype=float)
+    lower = prob < 0.5
+    res[lower] = -icdf_expo(1.0 - 2.0 * prob[lower], maximum, scale)
+    res[~lower] = icdf_expo(2.0 * (prob[~lower] - 0.5), maximum, scale)
+    return res
+
+
+def pdfn_self(value, minimum, maximum):
+    """Return the uniform probability density on [minimum, maximum]."""
+    density = 1.0 / (maximum - minimum)
+    if np.ndim(value) > 0:
+        return np.full(np.shape(value), density, dtype=float)
+    return density
+
+
+def pdfn_logt(value, minimum, maximum):
+    """Return the log-uniform probability density on [minimum, maximum]."""
+    return 1.0 / (np.log(maximum) - np.log(minimum)) / value
+
+
+def pdfn_gaus(value, mean, standard_deviation):
+    """Return the Gaussian probability density."""
+    return 1.0 / (np.sqrt(2.0 * np.pi) * standard_deviation) * np.exp(
+        -0.5 * ((value - mean) / standard_deviation) ** 2
+    )
+
+
+def pdfn_lnor(value, mean, standard_deviation):
+    """Return the log-normal probability density."""
+    return pdfn_gaus(np.log(value), np.log(mean), standard_deviation)
+
+
+pdfn_lgau = pdfn_lnor
+
+
+def pdfn_expo(value, maximum, scale):
+    """Return the truncated exponential probability density on [0, maximum]."""
+    arr = np.asarray(value)
+    norm = 1.0 / scale / (1.0 - np.exp(-maximum / scale))
+    if (arr > maximum).any():
+        if arr.ndim == 0:
+            return 0.0
+        return np.where(arr > maximum, 0.0, norm * np.exp(-arr / scale))
+    return norm * np.exp(-value / scale)
+
+
+def pdfn_dexp(value, maximum, scale):
+    """Return the double-exponential probability density on [-maximum, maximum]."""
+    return 0.5 * pdfn_expo(np.fabs(value), maximum, scale)
+
+
+def pdfn_powr(value, minimum, maximum, slope):
+    """Return the power-law probability density."""
+    norm = (1.0 - slope) / (maximum ** (1.0 - slope) - minimum ** (1.0 - slope))
+    return norm * value ** (-slope)
+
+
+def pdfn_dpow(value, minimum, maximum, break_value, slope_lower, slope_upper):
+    """Return the broken power-law probability density."""
+    xdat = np.atleast_1d(np.asarray(value))
+    faca = 1.0 / (
+        break_value ** (slope_lower - slope_upper)
+        * (break_value ** (1.0 - slope_lower) - minimum ** (1.0 - slope_lower))
+        / (1.0 - slope_lower)
+        + (maximum ** (1.0 - slope_upper) - break_value ** (1.0 - slope_upper))
+        / (1.0 - slope_upper)
+    )
+    pdfn = np.empty_like(xdat, dtype=float)
+    indxlowr = np.where(xdat <= break_value)[0]
+    indxuppr = np.where(xdat > break_value)[0]
+    if indxlowr.size > 0:
+        pdfn[indxlowr] = faca * break_value ** (slope_lower - slope_upper) * xdat[indxlowr] ** (-slope_lower)
+    if indxuppr.size > 0:
+        pdfn[indxuppr] = faca * xdat[indxuppr] ** (-slope_upper)
+    return pdfn[0] if np.isscalar(value) else pdfn
+
+
+def pdfn_igam(value, slope, cutoff):
+    """Return the inverse-gamma probability density."""
+    return invgamma.pdf(value, slope - 1.0, scale=cutoff)
+
+
+def pdfn_atan(value, minimum, maximum):
+    """Return the arctan-transformed probability density."""
+    return 1.0 / (value ** 2 + 1.0) / (np.arctan(maximum) - np.arctan(minimum))
+
+
+def find_nearest_index(array, value):
+    """Return the index of the element in array closest to value."""
+    arr = np.asarray(array)
+    return int((np.abs(arr - value)).argmin())
+
+
+find_nearest = find_nearest_index
+
+
+def rescale_range(data, old_min, old_max, new_min, new_max):
+    """Linearly map data from interval [old_min, old_max] to [new_min, new_max]."""
+    return new_min + (new_max - new_min) / (old_max - old_min) * (data - old_min)
+
+
+range_shift = rescale_range
 
 
 def bin_spectrum(

@@ -12,6 +12,10 @@ from tdpy.numerics import (
     icdf_gaus,
     icdf_logt,
     icdf_self,
+    find_nearest,
+    find_nearest_index,
+    rescale_range,
+    range_shift,
     linearized_gaussian_retrieval,
     paired_shared_parameter_forecast,
     profile_grid_models,
@@ -93,6 +97,74 @@ def test_linearized_gaussian_retrieval_rejects_unconstrained_null_direction():
         linearized_gaussian_retrieval(
             np.zeros(2), np.ones(2), model, np.eye(1), np.full(2, np.inf)
         )
+
+
+def test_find_nearest_index():
+    array = np.array([1.0, 2.5, 5.0, 10.0])
+    assert find_nearest_index(array, 2.4) == 1
+    assert find_nearest(array, 9.8) == 3
+    assert find_nearest(array, 0.0) == 0
+
+
+def test_rescale_range():
+    val = np.array([0.0, 0.5, 1.0])
+    rescaled = rescale_range(val, 0.0, 1.0, 10.0, 20.0)
+    np.testing.assert_allclose(rescaled, [10.0, 15.0, 20.0])
+    assert range_shift(0.5, 0.0, 1.0, -np.pi, np.pi) == pytest.approx(0.0)
+
+
+def test_analytical_probability_densities():
+    from tdpy.numerics import (
+        cdfn_dexp,
+        cdfn_expo,
+        icdf_dexp,
+        icdf_expo,
+        pdfn_atan,
+        pdfn_dexp,
+        pdfn_dpow,
+        pdfn_expo,
+        pdfn_gaus,
+        pdfn_igam,
+        pdfn_lgau,
+        pdfn_lnor,
+        pdfn_logt,
+        pdfn_powr,
+        pdfn_self,
+    )
+
+    # Uniform PDF
+    assert pdfn_self(2.0, 1.0, 5.0) == pytest.approx(0.25)
+    np.testing.assert_allclose(pdfn_self(np.array([2.0, 3.0]), 1.0, 5.0), [0.25, 0.25])
+
+    # Log-uniform PDF
+    assert pdfn_logt(np.e, 1.0, np.e**2) == pytest.approx(1.0 / (2.0 * np.e))
+
+    # Gaussian and Log-normal PDF
+    assert pdfn_gaus(0.0, 0.0, 1.0) == pytest.approx(1.0 / np.sqrt(2.0 * np.pi))
+    assert pdfn_lnor(np.e, 1.0, 1.0) == pytest.approx(pdfn_gaus(1.0, 0.0, 1.0))
+    assert pdfn_lgau(np.e, 1.0, 1.0) == pytest.approx(pdfn_lnor(np.e, 1.0, 1.0))
+
+    # Exponential PDF and CDF/ICDF round-trip
+    prob_exp = cdfn_expo(2.0, 10.0, 2.0)
+    assert icdf_expo(prob_exp, 10.0, 2.0) == pytest.approx(2.0)
+    assert pdfn_expo(0.0, 10.0, 2.0) > 0.0
+    assert pdfn_expo(15.0, 10.0, 2.0) == 0.0
+
+    # Double exponential
+    assert pdfn_dexp(0.0, 10.0, 2.0) == pytest.approx(0.5 * pdfn_expo(0.0, 10.0, 2.0))
+    prob_dexp = cdfn_dexp(1.5, 10.0, 2.0)
+    assert icdf_dexp(prob_dexp, 10.0, 2.0) == pytest.approx(1.5)
+
+    # Power law
+    assert pdfn_powr(2.0, 1.0, 4.0, 2.0) > 0.0
+
+    # Broken power law
+    dpow_val = pdfn_dpow(2.0, 1.0, 10.0, 3.0, 1.5, 2.5)
+    assert dpow_val > 0.0
+
+    # Inverse gamma and arctan
+    assert pdfn_igam(2.0, 3.0, 1.0) > 0.0
+    assert pdfn_atan(0.0, -1.0, 1.0) == pytest.approx(1.0 / (np.pi / 2.0))
 
 
 def test_linearized_gaussian_retrieval_proper_prior_constrains_null_direction():

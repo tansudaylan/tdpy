@@ -45,3 +45,47 @@ def subset_population(
         sample_counts[subset_name] = normalized_indices.size
 
     return normalized_indices
+
+
+def partition_classified_population(
+    relevant: Any,
+    irrelevant: Any,
+    positive: Any,
+    negative: Any,
+) -> dict[str, Any]:
+    """Group target indices by true relevance and inferred classification.
+
+    Parameters
+    ----------
+    relevant : array_like
+        Indices of truly relevant targets.
+    irrelevant : array_like
+        Indices of truly irrelevant targets.
+    positive : array_like
+        Indices classified as positive.
+    negative : array_like
+        Indices classified as negative.
+
+    Returns
+    -------
+    dict
+        Dictionary containing arrays or collections of:
+        - 're': relevant
+        - 'ir': irrelevant
+        - 'po': positive
+        - 'ne': negative
+        - 'trpo': true positives
+        - 'trne': true negatives
+        - 'flpo': false positives
+        - 'flne': false negatives
+    """
+    return {
+        "re": relevant,
+        "ir": irrelevant,
+        "po": positive,
+        "ne": negative,
+        "trpo": np.intersect1d(positive, relevant),
+        "trne": np.intersect1d(negative, irrelevant),
+        "flpo": np.intersect1d(positive, irrelevant),
+        "flne": np.intersect1d(negative, relevant),
+    }

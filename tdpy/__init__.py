@@ -18,6 +18,7 @@ from .exoplanet import *
 from .numerics import *
 from .pandeia import *
 from .plotting import *
+from .population import *
 from .serialization import *
 from .spectral import *
 from .tess import *
