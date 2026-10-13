@@ -250,6 +250,43 @@ def test_paired_shared_parameter_forecast_matches_analytical_difference():
     assert grid["1.0"]["noncentrality"] == pytest.approx(0.5)
 
 
+    def test_weighted_quantile_and_median():
+        from tdpy.numerics import weighted_quantile, weighted_median
+
+        values = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        weights = np.array([1.0, 1.0, 10.0, 1.0, 1.0])
+
+        # Unweighted quantile matches np.quantile
+        np.testing.assert_allclose(
+            weighted_quantile(values, [0.25, 0.5, 0.75]),
+            np.quantile(values, [0.25, 0.5, 0.75]),
+        )
+        assert weighted_median(values) == pytest.approx(3.0)
+
+        # Weighted quantile pulls median towards value with highest weight
+        assert weighted_median(values, weights) == pytest.approx(3.0)
+
+        # 2D samples across axis=0
+        samples_2d = np.column_stack([values, values * 2.0])
+        medians_2d = weighted_median(samples_2d, weights, axis=0)
+        np.testing.assert_allclose(medians_2d, [3.0, 6.0])
+
+        # Edge cases
+        with pytest.raises(ValueError, match="values must be a nonempty"):
+            weighted_quantile(np.array([]), 0.5)
+        with pytest.raises(ValueError, match="quantiles must be within"):
+            weighted_quantile(values, 1.5)
+
+
+    def test_grid_quantiles():
+        from tdpy.numerics import grid_quantiles
+
+        grid = np.linspace(-5.0, 5.0, 2001)
+        pdf = np.exp(-0.5 * grid**2) / np.sqrt(2.0 * np.pi)
+        quantiles = grid_quantiles(grid, pdf, [0.158655, 0.5, 0.841345])
+        np.testing.assert_allclose(quantiles, [-1.0, 0.0, 1.0], atol=1e-2)
+
+
 def test_exponential_noise_covariance_adds_correlated_component():
     covariance = exponential_noise_covariance(
         np.array([0.0, 1.0]),

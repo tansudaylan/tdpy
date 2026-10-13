@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
   "astropy",
+  "astroquery",
   "matplotlib",
   "numpy",
   "pandas",
@@ -30,6 +31,9 @@ dependencies = [
   "tesswcs",
   "tqdm"
 ]
+
+[project.optional-dependencies]
+bokeh = ["bokeh>=3.4"]
 
 [tool.setuptools.packages.find]
 include = ["tdpy*"]

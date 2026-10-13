@@ -47,6 +47,15 @@ def subset_population(
     return normalized_indices
 
 
+def retr_subp(populations, sample_counts, sample_indices, source_name, subset_name, indices):
+    """Retain the historical population-subsetting call signature and index metadata."""
+
+    if isinstance(indices, list):
+        raise ValueError('indices must be an array, not a list')
+    subset_population(populations, source_name, subset_name, indices, sample_counts, sample_indices)
+    sample_indices[subset_name] = {}
+
+
 def partition_classified_population(
     relevant: Any,
     irrelevant: Any,

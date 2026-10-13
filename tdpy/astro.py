@@ -19,7 +19,7 @@ from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_sun
 from astropy.time import Time
 from astropy.utils import iers
 
-from .plotting import save_figure
+from .plotting import save_bokeh_html, save_figure
 
 
 @dataclass(frozen=True)
@@ -92,11 +92,79 @@ def plot_target_visibility(
 ) -> Path:
     """Plot nightly altitude and annual dark-time visibility."""
 
-    import matplotlib.pyplot as plt
-
     output_path = Path(output_path)
-    if output_path.suffix not in {'.png', '.pdf'}:
-        raise ValueError('output_path must end in .png or .pdf')
+    if output_path.suffix == ".html":
+        from bokeh.layouts import column
+        from bokeh.models import HoverTool
+        from bokeh.plotting import figure
+
+        hours = result.hours_from_midnight
+        dark_time = result.nightly_sun_altitude_degrees < -12.0
+        nightly = figure(
+            title=f"Nightly visibility from {observatory_label}",
+            width=760,
+            height=340,
+            sizing_mode="stretch_width",
+            tools="pan,wheel_zoom,box_zoom,reset,save",
+        )
+        nightly.varea(
+            x=hours,
+            y1=0.0,
+            y2=np.where(dark_time, 90.0, 0.0),
+            color="#DDE7EA",
+            alpha=0.65,
+            legend_label="Astronomical target window",
+        )
+        nightly.line(
+            hours,
+            result.nightly_altitude_degrees,
+            color="#176B87",
+            line_width=2.2,
+            legend_label=target_label,
+        )
+        nightly.xaxis.axis_label = "Time from local midnight [hour]"
+        nightly.yaxis.axis_label = "Altitude [deg]"
+        nightly.y_range.start = 0.0
+        nightly.y_range.end = 90.0
+        nightly.add_tools(
+            HoverTool(tooltips=[("Hour", "$x"), ("Altitude [deg]", "$y")])
+        )
+
+        annual_finite = np.isfinite(result.annual_max_altitude_degrees)
+        annual = figure(
+            title="Annual observing accessibility",
+            width=760,
+            height=320,
+            sizing_mode="stretch_width",
+            tools="pan,wheel_zoom,box_zoom,reset,save",
+        )
+        annual.line(
+            result.days_from_year_start[annual_finite],
+            result.annual_max_altitude_degrees[annual_finite],
+            color="#C23B22",
+            line_width=2.2,
+            legend_label="Maximum during darkness",
+        )
+        annual.xaxis.axis_label = "Time from year start [day]"
+        annual.yaxis.axis_label = "Maximum altitude [deg]"
+        annual.y_range.start = 0.0
+        annual.y_range.end = 90.0
+        annual.add_tools(
+            HoverTool(tooltips=[("Day", "$x"), ("Altitude [deg]", "$y")])
+        )
+        for plot in (nightly, annual):
+            plot.grid.visible = False
+            plot.legend.location = "top_left"
+        return save_bokeh_html(
+            column(nightly, annual, sizing_mode="stretch_width"),
+            output_path,
+            title=f"{target_label} visibility from {observatory_label}",
+        )
+
+    if output_path.suffix not in {".png", ".pdf"}:
+        raise ValueError("output_path must end in .png, .pdf, or .html")
+
+    import matplotlib.pyplot as plt
 
     figure, axes = plt.subplots(2, 1, figsize=(8.0, 6.8), constrained_layout=True)
     axes[0].plot(

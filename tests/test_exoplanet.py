@@ -357,3 +357,38 @@ def test_planetary_metric_and_orbital_helpers():
     out_indices = transit_time_indices(time_series, epoch_days=1.0, period_days=3.0, duration_hours=2.4, out_of_transit=True)
     assert center_idx not in out_indices
     assert len(indices) + len(out_indices) == len(time_series)
+
+
+def test_temperatures_roche_and_densities():
+    from tdpy.exoplanet import (
+        equilibrium_temperature,
+        irradiation_temperature,
+        planetary_bulk_density,
+        planetary_escape_velocity,
+        roche_distance,
+        stellar_bulk_density,
+    )
+
+    # Earth equilibrium temperature around Sun: T_* ~ 5778 K, a/R_* ~ 215 -> R_*/a ~ 1/215
+    teq_earth = equilibrium_temperature(5778.0, 1.0 / 215.0)
+    assert teq_earth == pytest.approx(278.5, rel=1e-2)
+
+    # Irradiation temperature is sqrt(2) * T_eq for A=0
+    tirr_earth = irradiation_temperature(5778.0, 1.0 / 215.0)
+    assert tirr_earth == pytest.approx(teq_earth * np.sqrt(2.0))
+
+    # Roche distance
+    a_roche_fluid = roche_distance(1.0, 1.0, 3e-6, fluid=True)
+    a_roche_rigid = roche_distance(1.0, 1.0, 3e-6, fluid=False)
+    assert a_roche_fluid > a_roche_rigid > 0.0
+
+    # Bulk densities
+    rho_earth = planetary_bulk_density(1.0, 1.0)
+    assert rho_earth == pytest.approx(5.5134, rel=1e-3)
+
+    rho_sun = stellar_bulk_density(1.0, 1.0)
+    assert rho_sun == pytest.approx(1.408, rel=1e-3)
+
+    # Planetary escape velocity
+    v_esc_earth = planetary_escape_velocity(1.0, 1.0)
+    assert v_esc_earth == pytest.approx(11.2)

@@ -13,21 +13,16 @@ import warnings
 
 # packages whose own numerical and plotting warnings are silenced together with their printing
 LISTNAMEPACK = [
-    "abydos",
-    "aspendos",
     "assos",
     "chalcedon",
     "darkinferno",
     "ephesos",
     "gordion",
-    "hattusa",
     "lygos",
     "mejiro",
     "miletos",
-    "nicomedia",
     "pcat",
     "pergamon",
-    "sardis",
     "tdpy",
     "troia",
 ]

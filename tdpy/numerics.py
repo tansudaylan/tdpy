@@ -483,3 +483,87 @@ def weighted_linear_regression(
 
 
 retr_mlikregr = weighted_linear_regression
+
+
+def weighted_quantile(
+    values: np.ndarray,
+    quantiles: float | list[float] | np.ndarray,
+    sample_weight: np.ndarray | None = None,
+) -> float | np.ndarray:
+    """Compute 1D quantiles with optional sample weights."""
+    vals = np.asarray(values, dtype=float)
+    if vals.ndim != 1 or vals.size == 0 or not np.isfinite(vals).all():
+        raise ValueError("values must be a nonempty 1D array of finite numbers.")
+    quants = np.asarray(quantiles, dtype=float)
+    if np.any((quants < 0.0) | (quants > 1.0)) or not np.isfinite(quants).all():
+        raise ValueError("quantiles must be within [0, 1].")
+
+    if sample_weight is None:
+        result = np.quantile(vals, quants)
+    else:
+        weights = np.asarray(sample_weight, dtype=float)
+        if weights.shape != vals.shape or not np.isfinite(weights).all() or np.any(weights < 0.0):
+            raise ValueError("sample_weight must match values shape with finite non-negative values.")
+        total_weight = weights.sum()
+        if total_weight <= 0.0:
+            raise ValueError("sample_weight must have positive sum.")
+        sorter = np.argsort(vals)
+        vals_sorted = vals[sorter]
+        weights_sorted = weights[sorter]
+        cdf = np.cumsum(weights_sorted) / total_weight
+        result = np.interp(quants, cdf, vals_sorted)
+
+    if np.ndim(quantiles) == 0:
+        return float(result)
+    return result
+
+
+def weighted_median(
+    values: np.ndarray,
+    sample_weight: np.ndarray | None = None,
+    axis: int | None = None,
+) -> float | np.ndarray:
+    """Compute median or weighted median along specified axis."""
+    vals = np.asarray(values, dtype=float)
+    if vals.ndim == 1 or axis is None:
+        return weighted_quantile(vals.ravel(), 0.50, sample_weight=sample_weight)
+    if axis == 0 and vals.ndim == 2:
+        if sample_weight is None:
+            return np.median(vals, axis=0)
+        return np.array([
+            weighted_quantile(vals[:, col_idx], 0.50, sample_weight=sample_weight)
+            for col_idx in range(vals.shape[1])
+        ])
+    raise NotImplementedError("weighted_median currently supports 1D arrays or 2D arrays with axis=0.")
+
+
+def grid_quantiles(
+    grid: np.ndarray,
+    probability_density: np.ndarray,
+    quantiles: float | list[float] | np.ndarray = (0.16, 0.50, 0.84),
+) -> float | np.ndarray:
+    """Compute credible intervals/quantiles from a 1D probability density on a grid."""
+    grid_arr = np.asarray(grid, dtype=float)
+    pdf_arr = np.asarray(probability_density, dtype=float)
+    if grid_arr.ndim != 1 or pdf_arr.ndim != 1 or grid_arr.size != pdf_arr.size:
+        raise ValueError("grid and probability_density must be 1D arrays of matching length.")
+    if grid_arr.size < 2:
+        raise ValueError("grid must contain at least 2 points.")
+    if np.any(np.diff(grid_arr) <= 0.0):
+        raise ValueError("grid must be strictly increasing.")
+    if np.any(pdf_arr < 0.0) or not np.isfinite(pdf_arr).all():
+        raise ValueError("probability_density must be finite and non-negative.")
+
+    total_prob = np.trapz(pdf_arr, grid_arr)
+    if total_prob <= 0.0:
+        raise ValueError("probability_density must have positive integral.")
+    normalized_pdf = pdf_arr / total_prob
+    dx = np.diff(grid_arr)
+    cumulative = np.concatenate(([0.0], np.cumsum(0.5 * (normalized_pdf[1:] + normalized_pdf[:-1]) * dx)))
+    cumulative = np.clip(cumulative, 0.0, 1.0)
+    cumulative[-1] = 1.0
+    quants = np.asarray(quantiles, dtype=float)
+    result = np.interp(quants, cumulative, grid_arr)
+    if np.ndim(quantiles) == 0:
+        return float(result)
+    return result

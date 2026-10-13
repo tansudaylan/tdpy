@@ -41,8 +41,10 @@ def test_target_visibility_samples_night_and_annual_darkness():
     assert (result.annual_max_altitude_degrees > 0.0).any()
 
 
-@pytest.mark.parametrize('format_name', ['png', 'pdf'])
+@pytest.mark.parametrize('format_name', ['png', 'pdf', 'html'])
 def test_target_visibility_writes_figure(tmp_path, format_name):
+    if format_name == 'html':
+        pytest.importorskip('bokeh')
     output_path = tmp_path / f'visibility.{format_name}'
     result = run_target_visibility_diagnostic(
         output_path=output_path,
@@ -61,6 +63,8 @@ def test_target_visibility_writes_figure(tmp_path, format_name):
     assert result.days_from_year_start.size == 53
     assert output_path.is_file()
     assert output_path.stat().st_size > 1000
+    if format_name == 'html':
+        assert 'Bokeh' in output_path.read_text(encoding='utf-8')
 
 
 def test_visibility_example_uses_tdpy_without_miletos():
@@ -75,6 +79,7 @@ def test_visibility_example_uses_tdpy_without_miletos():
     )
     assert completed.returncode == 0, completed.stderr
     assert '--observatory' in completed.stdout
+    assert '--bokeh' in completed.stdout
     print(f'Reading from {notebook_path}...')
     notebook = json.loads(notebook_path.read_text())
     sources = ''.join(''.join(cell['source']) for cell in notebook['cells'])

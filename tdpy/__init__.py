@@ -15,10 +15,12 @@ if not hasattr(np, 'trapz'):
 
 from .astro import *
 from .exoplanet import *
+from .mast import quer_mast, xmat_tici, retr_listtablobsv, retr_rascdeclfromstrgmast, setp_coorstrgmast
 from .numerics import *
 from .pandeia import *
 from .plotting import *
 from .population import *
+from .psf import evaluate_psf_profile
 from .serialization import *
 from .spectral import *
 from .tess import *

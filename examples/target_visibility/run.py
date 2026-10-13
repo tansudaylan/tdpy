@@ -45,6 +45,7 @@ def parse_arguments():
     parser.add_argument('--observatory', choices=OBSERVATORIES, default='TUG')
     parser.add_argument('--night', default='2022-07-13 00:00:00')
     parser.add_argument('--year-start', default='2022-01-01 00:00:00')
+    parser.add_argument('--bokeh', action='store_true', help='write an interactive HTML figure')
     add_plot_arguments(parser)
     return parser.parse_args()
 
@@ -53,8 +54,9 @@ def main():
     arguments = parse_arguments()
     observatory = OBSERVATORIES[arguments.observatory]
     target = TARGETS[arguments.target]
+    file_type = 'html' if arguments.bokeh else arguments.typefileplot
     output_path = Path(__file__).resolve().parent / 'visuals' / (
-        f'target_visibility_{arguments.target.lower()}.{arguments.typefileplot}'
+        f'target_visibility_{arguments.target.lower()}.{file_type}'
     )
     run_target_visibility_diagnostic(
         output_path=output_path,

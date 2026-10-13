@@ -12,7 +12,8 @@ The library includes utilities for:
 
 - environment-based filesystem and data-path normalization;
 - reusable plots for population and catalog analyses;
-- numerical support for array handling and scientific transforms;
+- self-contained interactive HTML figures through `tdpy.plotting.save_bokeh_html` and the optional `bokeh` extra;
+- numerical support for array handling, weighted medians and quantiles, and quantiles from gridded probability densities;
 - light-weight visualization utilities used across time-domain and catalog workflows;
 - reproducible output layout for figures and intermediate diagnostic products.
 
@@ -23,9 +24,27 @@ The library includes utilities for:
 - inspect intermediate analysis states with plots;
 - apply general numerical transforms used in astronomical analyses;
 - build periodic-event timing and overlap reports with `tdpy.astro`;
-- calculate interval contrasts and render atmosphere forecast figures with `tdpy.exoplanet`;
+- calculate bulk densities, Roche distances, escape velocities, equilibrium and irradiation temperatures, interval contrasts, and atmosphere forecasts with `tdpy.exoplanet`;
 - construct normalized NIRSpec calculations with `tdpy.pandeia`;
+- evaluate normalized line profiles, power-law/curved/cutoff continua, blackbody flux and luminosity, and AXIS transmission with `tdpy.spectral`;
 - run labeled, fail-fast command sequences with `tdpy.workflow`.
+
+## Profiles and catalog access
+
+Nicomedia's shared helpers now live here. `tdpy.evaluate_psf_profile` evaluates Gaussian, single-King, and double-King profiles from explicit parameters, with optional spherical-angle normalization over the supplied grid. The separate legacy `tdpy.retr_psfn` interface is unchanged. Existing spectral, radial-velocity, limb-darkening, photometric-noise, and population-subsetting functions remain canonical TDpy implementations.
+
+```bash
+python examples/psf_profiles/double_king_profile.py --typefileplot png
+python examples/psf_profiles/double_king_profile.py --typefileplot png --bokeh
+```
+
+![Explicit double-King profile and canonical-kernel comparison](examples/psf_profiles/double_king_profile.png)
+
+The example uses dimensionless core and tail widths of 0.8 and 1.7, indices of 2.2 and 3.4, and a core fraction of 0.35. It compares the explicit evaluator with the canonical kernel and reports zero difference for those inputs. The optional HTML version retains the transferred Bokeh interactions.
+
+`tdpy.mast` provides structured MAST requests, TIC column retrieval, TESS observation queries, and target-coordinate resolution. `tdpy.retr_dictfluxband` integrates blackbody surface flux over approximate top-hat passbands, or optional `sncosmo` LSST bandpasses. The historical `Bolometric` option spans only 0.1 to 10 microns. `tdpy.retr_dictxraystar` retains the inherited blackbody-plus-assumed-X-ray-fraction calculation, with assumed excess fractions of $6\times10^{-7}$ or $10^{-4}$ below 4000 K. Those fractions are model assumptions, not measured X-ray luminosities.
+
+Catalog adapters and population synthesis now belong to Pergamon. The original MIT notice is retained in `LICENSE.Nicomedia`.
 
 ## Installation
 
@@ -37,11 +56,13 @@ python -m pip install -e .
 export TDPY_PATH=/path/to/tdpy
 ```
 
+Install `python -m pip install -e '.[bokeh]'` to enable `tdpy.plotting.save_bokeh_html` and the maintained examples' interactive HTML outputs.
+
 `TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Other repositories follow the same `<REPOSITORY>_PATH` root convention.
 
 ## Console output
 
-tdpy and the pipelines built on it (PCAT, miletos, ephesos, nicomedia, and the others in this ecosystem) print nothing by default, including progress bars and their own numerical warnings. Set `export TDPY_VERBOSITY=1` to restore progress messages, file narration, and warnings.
+tdpy and the pipelines built on it (PCAT, miletos, ephesos, and the others in this ecosystem) print nothing by default, including progress bars and their own numerical warnings. Set `export TDPY_VERBOSITY=1` to restore progress messages, file narration, and warnings.
 
 ## Quick example
 
@@ -90,7 +111,10 @@ TDpy does not expose `tdpy.mcmc`, `tdpy.samp`, or posterior-sampling compatibili
 
 ```bash
 python examples/target_visibility/run.py --target TOI-1233 --observatory TUG
+python examples/target_visibility/run.py --target TOI-1233 --observatory TUG --bokeh
 ```
+
+Install `python -m pip install -e '.[bokeh]'` and add `--bokeh` to write the interactive companion as `examples/target_visibility/visuals/target_visibility_toi-1233.html`.
 
 ![Nightly and annual visibility of TOI-1233 from TUG](examples/target_visibility/visuals/target_visibility_toi-1233.png)
 

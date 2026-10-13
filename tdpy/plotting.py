@@ -93,6 +93,22 @@ def save_current_figure(path, typefileplot="png", typeplotback="norm", **kwargs)
     return save_figure(plt.gcf(), path, typefileplot, typeplotback, **kwargs)
 
 
+def save_bokeh_html(figure, path, title=None):
+    """Save a Bokeh layout as a self-contained interactive HTML document."""
+    from bokeh.io import save
+    from bokeh.resources import INLINE
+
+    path = Path(path)
+    if path.suffix.lower() != ".html":
+        raise ValueError("Bokeh output path must use the .html extension")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if title is None:
+        title = path.stem
+    print(f"Writing to {path}...")
+    save(figure, filename=str(path), title=title, resources=INLINE)
+    return path
+
+
 def figure_to_frame(figure, close_figure=True):
     """Render a Matplotlib figure into an RGB PIL image for an animation frame."""
     from PIL import Image
@@ -152,6 +168,7 @@ __all__ = [
     "normalize_plot_background",
     "plot_background_colors",
     "plot_file_path",
+    "save_bokeh_html",
     "save_current_figure",
     "save_figure",
     "write_animation",

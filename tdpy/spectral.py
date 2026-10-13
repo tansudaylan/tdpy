@@ -418,6 +418,116 @@ def evaluate_spectral_model(
     raise ValueError(f"Unsupported spectype {spectype!r}.")
 
 
+def retr_dictfluxband(
+    tmptstar, liststrgband, gdatfluxband=None, pathvisutarg=None, strgtarg=None,
+    typefileplot='png', typeverb=1,
+):
+    """Integrate blackbody surface flux over inherited approximate passbands.
+
+    Wavelengths span 0.1 to 10 microns. Named ultraviolet, visible, and TESS
+    bands are top-hat approximations, not measured throughput curves. The
+    historical Bolometric name covers this finite wavelength interval only.
+    LSST bands use optional sncosmo bandpasses.
+    """
+
+    from pathlib import Path
+    from types import SimpleNamespace
+    from .util import retr_axis
+    from .verbosity import print
+
+    if gdatfluxband is None:
+        minimum_wavelength = 0.1  # [micron]
+        maximum_wavelength = 10.0  # [micron]
+        bins, midpoints, _, _, _ = retr_axis(minimum_wavelength, maximum_wavelength,
+                                             numbpntsgrid=1000, scalpara='logt')
+        gdatfluxband = SimpleNamespace(binswlen=bins, midpwlen=midpoints, dictfunctran={},
+                                      numbband=len(liststrgband), indxband=np.arange(len(liststrgband)))
+        intervals = {'ULTRASAT': (0.23, 0.29), 'TESS-GEO-UV': (0.23, 0.29),
+                     'TESS-GEO-VIS': (0.4, 0.7), 'TESS': (0.6, 1.0)}  # [micron]
+        for band in liststrgband:
+            if band.startswith('LSST'):
+                import sncosmo
+
+                passband = sncosmo.get_bandpass('lsst' + band[-1])
+                transmission = np.interp(midpoints, 1e-4 * passband.wave, passband.trans,
+                                         left=0.0, right=0.0)
+            elif band == 'Bolometric':
+                transmission = np.ones_like(midpoints)
+            elif band in intervals:
+                lower, upper = intervals[band]
+                transmission = ((midpoints > lower) & (midpoints < upper)).astype(float)
+            else:
+                raise ValueError('Undefined passband %r' % band)
+            gdatfluxband.dictfunctran[band] = transmission
+    spectrum = blackbody_spectral_flux(tmptstar, xdat=gdatfluxband.midpwlen, typexdat='wlen')
+    fluxes = {band: np.trapz(spectrum * gdatfluxband.dictfunctran[band], x=gdatfluxband.midpwlen)
+              for band in liststrgband}
+    if pathvisutarg is not None:
+        import matplotlib.pyplot as plt
+
+        output_path = Path(pathvisutarg) / ('fluxband_%s_%s.%s' %
+                                          (strgtarg, '_'.join(liststrgband), typefileplot))
+        if not output_path.exists():
+            figure, axis = plt.subplots(figsize=(8, 5), facecolor='white')
+            secondary = axis.twinx()
+            axis.plot(gdatfluxband.midpwlen, spectrum, color='black')
+            for band in liststrgband:
+                if band != 'Bolometric':
+                    secondary.plot(gdatfluxband.midpwlen, gdatfluxband.dictfunctran[band], label=band)
+            axis.set(xscale='log', xlabel=r'Wavelength [$\mu$m]',
+                     ylabel=r'Surface spectral flux [W m$^{-2}$ $\mu$m$^{-1}$]')
+            secondary.set_ylabel('Transmission')
+            axis.grid(False)
+            secondary.grid(False)
+            if any(band != 'Bolometric' for band in liststrgband):
+                secondary.legend(frameon=True, fancybox=True, framealpha=1.0)
+            figure.tight_layout()
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            print('Writing to %s...' % output_path)
+            figure.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close(figure)
+    return fluxes, gdatfluxband
+
+
+def retr_dictxraystar(tmptstar, radistar, diststar):
+    """Preserve the inherited blackbody-plus-assumed-X-ray-fraction population model.
+
+    Inputs are [values, label] pairs, with temperature [K], radius [solar radii],
+    and optional distance [pc]. Assumed excess fractions are 6e-7, or 1e-4 below
+    4000 K. These are model assumptions, not measured X-ray luminosities.
+    """
+
+    temperature = np.asarray(tmptstar[0], dtype=float)  # [K]
+    radius = np.asarray(radistar[0], dtype=float)  # [R_Sun]
+    energy = band_energy_grid('AXIS0224')  # [eV]
+    bolometric_energy = band_energy_grid('bolo')  # [eV]
+    transmission = instrument_transmission(typeinst='AXIS', xdat=energy)
+    bolometric = bolometric_blackbody_luminosity(tmptstar, radistar)
+    fractions = np.where(temperature < 4000.0, 1e-4, 6e-7)
+    surface_flux = np.array([np.trapz(blackbody_flux_energy(value, energy) * transmission, x=energy)
+                             for value in temperature])  # [erg s^-1 cm^-2]
+    bolometric_test = np.array([np.trapz(blackbody_flux_energy(value, bolometric_energy), x=bolometric_energy)
+                                for value in temperature])  # [erg s^-1 cm^-2]
+    luminosity = 4.0 * np.pi * (6.957e10 * radius)**2 * surface_flux  # [erg s^-1]
+    predicted = luminosity + fractions * bolometric[0]  # [erg s^-1]
+    if diststar is None:
+        observed_flux = np.full(temperature.shape, np.nan)
+    else:
+        from .util import retr_factconv
+
+        parsec_cm = retr_factconv()['pccm']  # [cm]
+        observed_flux = predicted / (4.0 * np.pi * (np.asarray(diststar[0]) * parsec_cm)**2)
+    return {
+        'lumibbodbolo': bolometric,
+        'fracxrayboloaddi': [fractions, ''],
+        'fluxbbod0224': [surface_flux, r'erg s$^{-1}$ cm$^{-2}$'],
+        'lumibbod0224': [luminosity, r'erg s$^{-1}$'],
+        'lumipred0224': [predicted, r'erg s$^{-1}$'],
+        'fluxpred0224': [observed_flux, r'erg s$^{-1}$ cm$^{-2}$'],
+        'lumibbodbolotest': [bolometric_test, ''],
+    }
+
+
 retr_spec = evaluate_spectral_model
 retr_fluxspecbbodwlen = blackbody_flux_wavelength
 retr_fluxspecbbodener = blackbody_flux_energy
@@ -435,6 +545,8 @@ __all__ = [
     "instrument_transmission",
     "integrate_blackbody_flux_wavelength",
     "retr_blimener",
+    "retr_dictfluxband",
+    "retr_dictxraystar",
     "retr_fluxbolobbod",
     "retr_fluxspecbbod",
     "retr_fluxspecbbodener",

@@ -834,6 +834,9 @@ def retr_vesc(
     return escape_velocity_earth * np.sqrt(np.asarray(massplan) / np.asarray(radicomp))
 
 
+planetary_escape_velocity = retr_vesc
+
+
 def keplerian_orbital_speed(
     stellar_mass_solar: float | np.ndarray,
     semimajor_axis_au: float | np.ndarray,
@@ -972,6 +975,61 @@ def retr_radiroch(
     return np.asarray(radistar) * (2.0 * np.asarray(densstar) / np.asarray(denscomp)) ** (1.0 / 3.0)
 
 
+def roche_distance(
+    companion_radius: float | np.ndarray,
+    stellar_mass: float | np.ndarray,
+    companion_mass: float | np.ndarray,
+    fluid: bool = True,
+) -> float | np.ndarray:
+    """Calculate the Roche disruption distance for a companion orbiting a primary host.
+
+    Parameters
+    ----------
+    companion_radius : float or np.ndarray
+        Radius of the companion (same distance units as returned distance).
+    stellar_mass : float or np.ndarray
+        Mass of the primary host star.
+    companion_mass : float or np.ndarray
+        Mass of the secondary companion (same mass units as stellar_mass).
+    fluid : bool, optional
+        Whether to evaluate the fluid Roche limit (coefficient ~2.44) or rigid limit (~1.26).
+        Default is True (fluid).
+
+    Returns
+    -------
+    float or np.ndarray
+        Roche disruption distance in the same distance units as companion_radius.
+    """
+    coefficient = 2.44 if fluid else 1.26
+    mass_ratio = np.asarray(stellar_mass, dtype=float) / np.asarray(companion_mass, dtype=float)
+    dist = coefficient * np.asarray(companion_radius, dtype=float) * (mass_ratio ** (1.0 / 3.0))
+    if np.ndim(companion_radius) == 0 and np.ndim(stellar_mass) == 0 and np.ndim(companion_mass) == 0:
+        return float(dist)
+    return dist
+
+
+def planetary_bulk_density(
+    mass_earth: float | np.ndarray,
+    radius_earth: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the planetary bulk mean density in g / cm^3 from Earth units."""
+    dens = 5.5134 * np.asarray(mass_earth, dtype=float) / (np.asarray(radius_earth, dtype=float) ** 3)
+    if np.ndim(mass_earth) == 0 and np.ndim(radius_earth) == 0:
+        return float(dens)
+    return dens
+
+
+def stellar_bulk_density(
+    mass_solar: float | np.ndarray,
+    radius_solar: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the stellar bulk mean density in g / cm^3 from Solar units."""
+    dens = 1.408 * np.asarray(mass_solar, dtype=float) / (np.asarray(radius_solar, dtype=float) ** 3)
+    if np.ndim(mass_solar) == 0 and np.ndim(radius_solar) == 0:
+        return float(dens)
+    return dens
+
+
 def retr_radihill(
     smax: float | np.ndarray,
     masscomp: float | np.ndarray,
@@ -1074,6 +1132,53 @@ def retr_tmptplandayynigh(
     tmptdayy = np.asarray(tmptirra) * (2.0 / 3.0 - 5.0 / 12.0 * np.asarray(epsi)) ** 0.25  # [K]
     tmptnigh = np.asarray(tmptirra) * (np.asarray(epsi) / 4.0) ** 0.25  # [K]
     return tmptdayy, tmptnigh
+
+
+def equilibrium_temperature(
+    stellar_temperature_k: float | np.ndarray,
+    stellar_radius_over_semimajor_axis: float | np.ndarray,
+    albedo: float | np.ndarray = 0.0,
+    recirculation_factor: float = 1.0,
+) -> float | np.ndarray:
+    """Calculate the planetary equilibrium temperature in Kelvin.
+
+    Parameters
+    ----------
+    stellar_temperature_k : float or np.ndarray
+        Effective temperature of the host star in Kelvin.
+    stellar_radius_over_semimajor_axis : float or np.ndarray
+        Dimensionless ratio R_* / a (stellar radius over semi-major axis).
+    albedo : float or np.ndarray, optional
+        Bond albedo (default 0.0).
+    recirculation_factor : float, optional
+        Heat redistribution factor: 1.0 for full uniform redistribution (4 pi),
+        or 2.0 for dayside-only emission (2 pi) (default 1.0).
+
+    Returns
+    -------
+    float or np.ndarray
+        Equilibrium temperature in Kelvin.
+    """
+    rs2a = np.asarray(stellar_radius_over_semimajor_axis, dtype=float)
+    teff = np.asarray(stellar_temperature_k, dtype=float)
+    albedo_arr = np.asarray(albedo, dtype=float)
+    teq = teff * np.sqrt(0.5 * rs2a) * (1.0 - albedo_arr) ** 0.25 * (recirculation_factor ** 0.25)
+    if np.ndim(stellar_temperature_k) == 0 and np.ndim(stellar_radius_over_semimajor_axis) == 0:
+        return float(teq)
+    return teq
+
+
+def irradiation_temperature(
+    stellar_temperature_k: float | np.ndarray,
+    stellar_radius_over_semimajor_axis: float | np.ndarray,
+) -> float | np.ndarray:
+    """Calculate the planetary irradiation temperature T_irr = T_* * sqrt(R_* / a) in Kelvin."""
+    rs2a = np.asarray(stellar_radius_over_semimajor_axis, dtype=float)
+    teff = np.asarray(stellar_temperature_k, dtype=float)
+    tirr = teff * np.sqrt(rs2a)
+    if np.ndim(stellar_temperature_k) == 0 and np.ndim(stellar_radius_over_semimajor_axis) == 0:
+        return float(tirr)
+    return tirr
 
 
 def retr_esmm(
