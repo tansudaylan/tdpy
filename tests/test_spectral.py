@@ -85,3 +85,34 @@ def test_blackbody_flux_wavelength_and_energy_are_positive_and_peak():
     assert energies.size == 400
     assert flux_band[0] > 0.0
     assert np.any(flux_band > 0.0)
+
+
+def test_band_energy_grid_and_bolometric_luminosity():
+    from tdpy.spectral import (
+        band_energy_grid,
+        retr_blimener,
+        bolometric_blackbody_luminosity,
+        retr_fluxbolobbod,
+        instrument_transmission,
+        retr_functran,
+    )
+
+    axis_energies = band_energy_grid("AXIS0224")
+    assert axis_energies.size == 400
+    assert retr_blimener("AXIS0224").size == 400
+
+    bolo_energies = band_energy_grid("bolo")
+    assert bolo_energies.size == 1000
+
+    # Solar bolometric luminosity ~ 3.826e33 erg/s
+    lumi_sun = bolometric_blackbody_luminosity(5772.0, 1.0)
+    assert lumi_sun == pytest.approx(3.826e33, rel=1e-2)
+
+    # Unit pair compatibility: [temp, 'K'] and [radius, 'R_odot']
+    lumi_pair = retr_fluxbolobbod([5772.0, "K"], [1.0, "R_odot"])
+    assert lumi_pair[1] == "erg/s"
+    assert lumi_pair[0] == pytest.approx(3.826e33, rel=1e-2)
+
+    trans = instrument_transmission("AXIS", np.array([100.0, 500.0, 15000.0]))
+    np.testing.assert_array_equal(trans, [0.0, 1.0, 0.0])
+    assert retr_functran("AXIS", 1000.0) == 1.0

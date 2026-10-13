@@ -24,6 +24,22 @@ from tdpy.util import plot_lsst_ddf_tess_footprint
 SECTOR_ONE_CCD_CENTER = (319.2026575157548, -41.18304654929803)  # [deg]
 
 
+def test_tess_magnitude_and_flux_round_trip():
+    from tdpy.tess import tess_flux_from_magnitude, tess_magnitude_from_flux, retr_fluxfromtmag, retr_tmagfromflux
+
+    tmag = 10.0
+    flux = tess_flux_from_magnitude(tmag)
+    recovered_tmag = tess_magnitude_from_flux(flux)
+    assert recovered_tmag == pytest.approx(tmag)
+
+    assert retr_fluxfromtmag(tmag) == pytest.approx(flux)
+    assert retr_tmagfromflux(flux) == pytest.approx(tmag)
+
+    # Zeropoint test: at tmag=20.4, flux is 1.0 e-/s
+    assert tess_flux_from_magnitude(20.4) == pytest.approx(1.0)
+    assert tess_magnitude_from_flux(1.0) == pytest.approx(20.4)
+
+
 def test_tess_sector_footprints_return_all_ccds():
     footprints = tess_sector_footprints(1, samples_per_edge=8)
 

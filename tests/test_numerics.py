@@ -121,6 +121,49 @@ def test_profile_grid_models_selects_best_nuisance_model_per_group():
     assert profiles[(1,)]["score"] == pytest.approx(0.0)
 
 
+def test_retr_llik_corr_evaluates_bivariate_log_likelihood():
+    from tdpy.util import retr_llik_corr, gdatstrt
+
+    gdat = gdatstrt()
+    gdat.tempfrst = np.array([0.0, 1.0, 2.0])
+    gdat.tempfrststdv = np.array([0.1, 0.1, 0.1])
+    gdat.tempseco = np.array([0.0, 1.0, 2.0])
+    gdat.tempsecostdv = np.array([0.1, 0.1, 0.1])
+
+    # angle = 3*pi/4 gives slope = -1/tan(3*pi/4) = 1.0, intercept = 0.0
+    angle = 3.0 * np.pi / 4.0
+    intercept = 0.0
+    llik_good = retr_llik_corr((angle, intercept), gdat)
+    assert np.isfinite(llik_good)
+
+    # Offset intercept should decrease log likelihood
+    llik_bad = retr_llik_corr((angle, 5.0), gdat)
+    assert llik_good > llik_bad
+
+
+def test_weighted_linear_regression_recovers_known_parameters():
+    from tdpy.numerics import weighted_linear_regression, retr_mlikregr
+
+    x = np.linspace(0.0, 10.0, 50)
+    true_params = np.array([2.5, 1.8])
+    design = np.column_stack([np.ones_like(x), x])
+    variance = np.full_like(x, 0.25)
+    data = design @ true_params
+
+    params, cov = weighted_linear_regression(data, design, variance)
+    np.testing.assert_allclose(params, true_params, rtol=1e-10)
+    assert cov.shape == (2, 2)
+    assert np.all(np.diag(cov) > 0)
+
+    # Test alias retr_mlikregr
+    params_alias, cov_alias = retr_mlikregr(data, design, variance)
+    np.testing.assert_allclose(params_alias, true_params, rtol=1e-10)
+
+    # Test 2D covariance matrix input
+    params_2d, cov_2d = weighted_linear_regression(data, design, np.diag(variance))
+    np.testing.assert_allclose(params_2d, true_params, rtol=1e-10)
+
+
 def test_paired_shared_parameter_forecast_matches_analytical_difference():
     result = paired_shared_parameter_forecast(
         {"first": np.eye(2), "second": np.eye(2)},

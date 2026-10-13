@@ -421,8 +421,26 @@ def animate_tess_sectors(
     return write_animation(frames, output_path, duration_ms=duration_ms)
 
 
+TESS_MAGNITUDE_ZEROPOINT_ELECTRONS_PER_SECOND = 20.4
+
+
+def tess_flux_from_magnitude(tmag: float | np.ndarray) -> float | np.ndarray:
+    """Calculate the TESS electron flux per second from TESS magnitude."""
+    return 10.0 ** (0.4 * (TESS_MAGNITUDE_ZEROPOINT_ELECTRONS_PER_SECOND - np.asarray(tmag)))
+
+
+def tess_magnitude_from_flux(flux: float | np.ndarray) -> float | np.ndarray:
+    """Calculate the TESS magnitude from electron flux per second."""
+    return TESS_MAGNITUDE_ZEROPOINT_ELECTRONS_PER_SECOND - 2.5 * np.log10(np.asarray(flux))
+
+
+retr_fluxfromtmag = tess_flux_from_magnitude
+retr_tmagfromflux = tess_magnitude_from_flux
+
+
 __all__ = [
     "DETECTOR_SHAPE",
+    "TESS_MAGNITUDE_ZEROPOINT_ELECTRONS_PER_SECOND",
     "TessCcdFootprint",
     "TessToiAlert",
     "animate_tess_sectors",
@@ -430,7 +448,11 @@ __all__ = [
     "plot_tess_sector_map",
     "plot_tess_sector_sequence",
     "plot_tess_visibility",
+    "retr_fluxfromtmag",
+    "retr_tmagfromflux",
     "target_is_visible",
+    "tess_flux_from_magnitude",
+    "tess_magnitude_from_flux",
     "tess_sector_footprints",
     "tess_sector_dates",
     "tess_target_visibility",

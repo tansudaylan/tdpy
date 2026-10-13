@@ -3529,6 +3529,16 @@ def retr_xposypos(gang, aang):
     return xpos, ypos
 
 
+def retr_gang(xpos, ypos):
+    """Return the radial distance coordinate for Cartesian coordinates."""
+    return np.sqrt(xpos**2 + ypos**2)
+
+
+def retr_aang(xpos, ypos):
+    """Return the wrapped position angle [0, 2*pi) for Cartesian coordinates."""
+    return np.mod(np.arctan2(ypos, xpos), 2.0 * np.pi)
+
+
 def read_fits(path, pathvisu=None, typeverb=1):
     '''
     Read FITS file
@@ -4716,19 +4726,19 @@ def retr_modl_corr(gdat, feat, inpt):
     return line, []
 
 
-def retr_llik_corr(feat, gdat):
-    '''
-    Return the likelihood for a linear model
-    '''
-    angl = feat[0]
-    gamm = feat[1]
-
-    dist = np.cos(angl) * gdat.tempfrst + np.sin(angl) * gdat.tempseco - gamm
-    vari = np.cos(angl)**2 * gdat.tempfrststdv**2 + np.sin(angl)**2 * gdat.tempsecostdv**2
-
-    llik = -0.5 * np.sum(dist**2 / vari)
-
-    return llik
+def retr_llik_corr(para, gdat):
+    """Fit a line at the residual scale supplied by the population data."""
+    angle, intercept = para
+    if np.isclose(np.sin(angle), 0.0):
+        return -np.inf
+    slope = -1.0 / np.tan(angle)
+    variance = gdat.tempsecostdv**2 + (slope * gdat.tempfrststdv)**2
+    if np.any(variance <= 0.0):
+        return -np.inf
+    model = slope * gdat.tempfrst + intercept / np.sin(angle)
+    return -0.5 * np.sum(
+        (gdat.tempseco - model)**2 / variance + np.log(2.0 * np.pi * variance)
+    )
 
 
 
@@ -4984,8 +4994,10 @@ def retr_dict(listname):
 
 
 from .exoplanet import (
+    companion_flux_dilution,
     fold_tser,
     keplerian_orbit_radial_velocity,
+    keplerian_orbital_speed,
     keplerian_semi_amplitude,
     relative_flux_from_delta_magnitude,
     retr_albg,
@@ -4993,12 +5005,17 @@ from .exoplanet import (
     retr_brgtlmdk,
     retr_deptbeam,
     retr_deptelli,
+    retr_dictsols,
+    retr_dilu,
     retr_duratranfull,
     retr_duratrantotl,
     retr_esmm,
     retr_imfa,
+    retr_indxtimetran,
+    retr_indxtran,
     retr_lcurmodl_flarsing,
     retr_listcolrcomp,
+    retr_listepoctran,
     retr_liststrgcomp,
     retr_logg,
     retr_perikepl,
@@ -5007,6 +5024,7 @@ from .exoplanet import (
     retr_radiroch,
     retr_reso,
     retr_rflxfromdmag,
+    retr_rflxmodlrise,
     retr_rs2a,
     retr_rsmacomp,
     retr_rvel,
@@ -5016,13 +5034,45 @@ from .exoplanet import (
     retr_tmptplandayynigh,
     retr_tsmm,
     retr_vesc,
+    retr_vorb,
+    retr_vorbkepl,
+    solar_system_planets,
     stellar_limb_darkened_brightness,
+    transit_epochs,
+    transit_time_indices,
+    transit_times,
 )
 from .spectral import (
+    band_energy_grid,
     blackbody_flux_energy,
     blackbody_flux_wavelength,
     blackbody_spectral_flux,
+    bolometric_blackbody_luminosity,
+    instrument_transmission,
+    retr_blimener,
+    retr_fluxbolobbod,
     retr_fluxspecbbod,
     retr_fluxspecbbodener,
     retr_fluxspecbbodwlen,
+    retr_functran,
+)
+from .numerics import (
+    weighted_linear_regression,
+    retr_mlikregr,
+)
+from .tess import (
+    tess_flux_from_magnitude,
+    tess_magnitude_from_flux,
+    retr_fluxfromtmag,
+    retr_tmagfromflux,
+)
+from .astro import (
+    flux_from_magnitude,
+    instrument_zeropoint,
+    magnitude_from_flux,
+    photometric_noise,
+    retr_fluxfrommagt,
+    retr_magtfromflux,
+    retr_noisphot,
+    retr_pntszero,
 )

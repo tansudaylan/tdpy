@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import numpy as np
 import pytest
 
 from tdpy.astro import (
@@ -225,3 +226,46 @@ def test_select_transiting_planet_pair_comparisons_applies_target_thresholds():
     assert len(substantial) == 2
     assert bright == [target]
     assert joint == pairs[:2]
+
+
+def test_instrument_zeropoints_and_flux_conversions():
+    from tdpy.astro import (
+        instrument_zeropoint,
+        magnitude_from_flux,
+        flux_from_magnitude,
+        photometric_noise,
+        retr_pntszero,
+        retr_magtfromflux,
+        retr_fluxfrommagt,
+        retr_noisphot,
+    )
+
+    assert instrument_zeropoint("TESS") == 20.4
+    assert retr_pntszero("TESS") == 20.4
+    assert instrument_zeropoint("TESS-GEO-UV") == -19.0
+    with pytest.raises(ValueError, match="Unknown instrument"):
+        instrument_zeropoint("Nonexistent")
+
+    # Round trip: mag <-> flux
+    tmag = 10.0
+    flux = flux_from_magnitude(tmag, "TESS")
+    recovered_tmag = magnitude_from_flux(flux, "TESS")
+    assert recovered_tmag == pytest.approx(tmag)
+    assert retr_magtfromflux(flux, "TESS") == pytest.approx(tmag)
+
+    # Uncertainty propagation:
+    flux_val, flux_err = flux_from_magnitude(tmag, "TESS", uncertainty=0.1)
+    assert flux_err == pytest.approx(np.log(10.0) * 0.4 * flux_val * 0.1)
+
+    # Photometric noise models
+    tess_noise = photometric_noise(10.0, "TESS")
+    assert 0.0 < tess_noise < 1.0  # [ppt]
+    assert retr_noisphot(10.0, "TESS") == pytest.approx(tess_noise)
+
+    ultrasat_noise = photometric_noise(18.0, "ULTRASAT")
+    assert ultrasat_noise > 0.0
+
+    lsst_noise = photometric_noise(np.array([18.0, 22.0, 25.0]), "LSSTgband")
+    assert lsst_noise[0] == pytest.approx(0.5)
+    assert lsst_noise[1] == pytest.approx(0.5 * 10.0 ** ((0.4 * 22.0 - 20.0) / 3.0))
+    assert lsst_noise[2] == pytest.approx(1000.0)

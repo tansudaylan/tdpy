@@ -301,3 +301,50 @@ def template_goodness_of_fit(
         ),
         "degrees_freedom": degrees_freedom,
     }
+
+
+def weighted_linear_regression(
+    data: np.ndarray,
+    design_matrix: np.ndarray,
+    variance: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return maximum likelihood estimates and parameter covariance for linear regression.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Observed 1D data vector of shape (N,).
+    design_matrix : np.ndarray
+        Linear model design matrix of shape (N, M).
+    variance : np.ndarray
+        Data noise variance vector of shape (N,) or full covariance matrix (N, N).
+
+    Returns
+    -------
+    parameters : np.ndarray
+        Best-fit regression parameters of shape (M,).
+    covariance : np.ndarray
+        Parameter covariance matrix of shape (M, M).
+    """
+    data = np.asarray(data)
+    design_matrix = np.asarray(design_matrix)
+    variance = np.asarray(variance)
+
+    if variance.ndim == 1:
+        inv_variance = 1.0 / variance
+        design_weighted = design_matrix * inv_variance[:, None]
+        normal_matrix = np.matmul(design_matrix.T, design_weighted)
+        covariance = np.linalg.inv(normal_matrix)
+        rhs = np.matmul(design_weighted.T, data)
+        parameters = np.matmul(covariance, rhs)
+    else:
+        inv_variance = np.linalg.inv(variance)
+        normal_matrix = np.matmul(design_matrix.T, np.matmul(inv_variance, design_matrix))
+        covariance = np.linalg.inv(normal_matrix)
+        rhs = np.matmul(design_matrix.T, np.matmul(inv_variance, data))
+        parameters = np.matmul(covariance, rhs)
+
+    return parameters, covariance
+
+
+retr_mlikregr = weighted_linear_regression

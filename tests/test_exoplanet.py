@@ -282,3 +282,55 @@ def test_planetary_metric_and_orbital_helpers():
     assert flux == pytest.approx(0.1)
     assert flux_err > 0.0
     assert retr_rflxfromdmag(0.0) == pytest.approx(1.0)
+
+    # solar system planets
+    from tdpy.exoplanet import solar_system_planets, retr_dictsols, keplerian_orbital_speed, retr_vorb
+
+    sols = solar_system_planets()
+    assert len(sols["name"]) == 8
+    assert sols["name"][2] == "Earth"
+    assert sols["mass"][2] == pytest.approx(1.0)
+    assert sols["radi"][2] == pytest.approx(1.0)
+    assert retr_dictsols()["name"][0] == "Mercury"
+
+    # keplerian orbital speed: ~29.78 km/s at 1 AU around 1 M_sun
+    v_earth = keplerian_orbital_speed(1.0, 1.0)
+    assert v_earth == pytest.approx(29.7847, rel=1e-3)
+    assert retr_vorb(1.0, 1.0) == pytest.approx(v_earth)
+
+    # dilution factor
+    from tdpy.exoplanet import companion_flux_dilution, retr_dilu, retr_rflxmodlrise
+
+    dilu = companion_flux_dilution(5778.0, 3500.0)
+    assert 0.0 < dilu < 1.0
+    assert retr_dilu(5778.0, 3500.0, "tess") == pytest.approx(dilu)
+
+    # quadratic rise profile
+    time_rise = np.array([-0.1, 0.0, 0.2])
+    rflx, dflx = retr_rflxmodlrise(time_rise, 0.0, 0.1, 0.05)
+    assert rflx[0] == 1.0
+    assert dflx[0] == 0.0
+    assert rflx[1] == 1.0
+    assert rflx[2] == pytest.approx(1.0 + 0.1 * 0.2 + 0.05 * 0.04)
+
+    # transit epochs and time indices
+    from tdpy.exoplanet import transit_epochs, transit_times, transit_time_indices, retr_indxtran, retr_listepoctran, retr_indxtimetran
+
+    time_series = np.linspace(0.0, 10.0, 1001)  # 0 to 10 days
+    epochs = transit_epochs(time_series, epoch_days=1.0, period_days=3.0, duration_hours=2.4)
+    assert list(epochs) == [0, 1, 2]
+    assert list(retr_indxtran(time_series, 1.0, 3.0, 2.4)) == [0, 1, 2]
+
+    times = transit_times(time_series, epoch_days=1.0, period_days=3.0, duration_hours=2.4)
+    np.testing.assert_allclose(times, [1.0, 4.0, 7.0])
+    np.testing.assert_allclose(retr_listepoctran(time_series, 1.0, 3.0, 2.4), [1.0, 4.0, 7.0])
+
+    indices = transit_time_indices(time_series, epoch_days=1.0, period_days=3.0, duration_hours=2.4)
+    assert indices.size > 0
+    # Center of transit at t=1.0 day should be in transit indices
+    center_idx = np.argmin(np.abs(time_series - 1.0))
+    assert center_idx in indices
+
+    out_indices = transit_time_indices(time_series, epoch_days=1.0, period_days=3.0, duration_hours=2.4, out_of_transit=True)
+    assert center_idx not in out_indices
+    assert len(indices) + len(out_indices) == len(time_series)

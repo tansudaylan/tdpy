@@ -20,8 +20,8 @@ def test_retr_xposypos_array_round_trip():
     aang = np.array([0., np.pi / 2., 3. * np.pi / 2.])
     xpos, ypos = tdpy.retr_xposypos(gang, aang)
 
-    np.testing.assert_allclose(np.sqrt(xpos**2 + ypos**2), gang)
-    np.testing.assert_allclose(np.mod(np.arctan2(ypos, xpos), 2. * np.pi), aang)
+    np.testing.assert_allclose(tdpy.retr_gang(xpos, ypos), gang)
+    np.testing.assert_allclose(tdpy.retr_aang(xpos, ypos), aang)
 
 
 def test_counter_returns_previous_index():

@@ -564,3 +564,141 @@ def plot_transiting_planet_pair_context(
     figure.savefig(output_path, dpi=300 if output_path.suffix == ".png" else None)
     plt.close(figure)
     return output_path
+
+
+INSTRUMENT_ZEROPOINTS: dict[str, float] = {
+    "TESS": 20.4,
+    "LSSTuband": -15.0,
+    "LSSTgband": -15.0,
+    "LSSTrband": -15.0,
+    "LSSTiband": -15.0,
+    "LSSTzband": -15.0,
+    "LSSTyband": -15.0,
+    "TESS-GEO-UV": -19.0,
+    "TESS-GEO-VIS": -17.0,
+    "ULTRASAT": 20.4,
+}
+
+
+def instrument_zeropoint(instrument: str, *, strginst: str | None = None) -> float:
+    """Return magnitude zeropoint for a supported instrument."""
+    if instrument is None and strginst is not None:
+        instrument = strginst
+    if instrument in INSTRUMENT_ZEROPOINTS:
+        return INSTRUMENT_ZEROPOINTS[instrument]
+    raise ValueError(f"Unknown instrument {instrument!r}. Supported instruments: {sorted(INSTRUMENT_ZEROPOINTS.keys())}")
+
+
+retr_pntszero = instrument_zeropoint
+
+
+def magnitude_from_flux(
+    flux: float | np.ndarray,
+    instrument: str = "TESS",
+    *,
+    strginst: str | None = None,
+) -> float | np.ndarray:
+    """Calculate magnitude from flux given instrument zeropoint."""
+    if strginst is not None:
+        instrument = strginst
+    pntszero = instrument_zeropoint(instrument)
+    flux_arr = np.asarray(flux, dtype=float)
+    mag = -2.5 * np.log10(flux_arr) + pntszero
+    if np.ndim(flux) == 0:
+        return float(mag)
+    return mag
+
+
+retr_magtfromflux = magnitude_from_flux
+
+
+def flux_from_magnitude(
+    magnitude: float | np.ndarray,
+    instrument: str = "TESS",
+    uncertainty: float | np.ndarray | None = None,
+    *,
+    magt: float | np.ndarray | None = None,
+    strginst: str | None = None,
+    stdvmagt: float | np.ndarray | None = None,
+) -> float | np.ndarray | tuple[float | np.ndarray, float | np.ndarray]:
+    """Calculate instrument flux from magnitude and zeropoint."""
+    if magt is not None:
+        magnitude = magt
+    if strginst is not None:
+        instrument = strginst
+    if stdvmagt is not None:
+        uncertainty = stdvmagt
+
+    pntszero = instrument_zeropoint(instrument)
+    mag = np.asarray(magnitude, dtype=float)
+    flux = 10.0 ** (-0.4 * (mag - pntszero))
+    if uncertainty is not None:
+        stdvflux = np.log(10.0) * 0.4 * flux * np.asarray(uncertainty, dtype=float)
+        if np.ndim(magnitude) == 0 and np.ndim(uncertainty) == 0:
+            return float(flux), float(stdvflux)
+        return flux, stdvflux
+    if np.ndim(magnitude) == 0:
+        return float(flux)
+    return flux
+
+
+retr_fluxfrommagt = flux_from_magnitude
+
+
+def photometric_noise(
+    magnitude: float | np.ndarray,
+    instrument: str = "TESS",
+    output_type: str = "intplite",
+    booldiag: bool = True,
+    *,
+    magtinpt: float | np.ndarray | None = None,
+    strginst: str | None = None,
+    typeoutp: str | None = None,
+) -> float | np.ndarray:
+    """Return instrument photometric noise [ppt] as a function of magnitude."""
+    import scipy.interpolate
+
+    if magtinpt is not None:
+        magnitude = magtinpt
+    if strginst is not None:
+        instrument = strginst
+    if typeoutp is not None:
+        output_type = typeoutp
+
+    is_scalar = np.isscalar(magnitude) or isinstance(magnitude, float) or (isinstance(magnitude, np.ndarray) and magnitude.ndim == 0)
+    mag_arr = np.atleast_1d(np.asarray(magnitude, dtype=float))
+    noise = np.full_like(mag_arr, np.inf)
+
+    if instrument.startswith("LSST"):
+        mask_mid = (mag_arr < 20.0) & (mag_arr > 15.0)
+        noise[mask_mid] = 0.5  # [ppt over 1 hour]
+        mask_faint = (mag_arr >= 20.0) & (mag_arr < 24.0)
+        noise[mask_faint] = 0.5 * 10.0 ** ((0.4 * mag_arr[mask_faint] - 20.0) / 3.0)
+        mask_deep = mag_arr >= 24.0
+        noise[mask_deep] = 1000.0  # [ppt]
+    elif instrument == "TESS":
+        if output_type == "intplite":
+            noise_table = np.array([40.0, 40.0, 40.0, 90.0, 200.0, 700.0, 3e3, 2e4]) * 1e-3  # [ppt]
+            mag_table = np.array([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0])
+            interpolator = scipy.interpolate.interp1d(mag_table, noise_table, fill_value="extrapolate")
+            noise = interpolator(mag_arr)
+        else:
+            raise ValueError(f"Unsupported output_type {output_type!r} for TESS.")
+    elif instrument == "TESS-GEO-UV":
+        noise = 200.0 * 10.0 ** (0.4 * (mag_arr - 22.5))
+    elif instrument == "TESS-GEO-VIS":
+        noise = 200.0 * 10.0 ** (0.4 * (mag_arr - 25.0))
+    elif instrument == "ULTRASAT":
+        noise = 200.0 * 10.0 ** (0.4 * (mag_arr - 22.4))
+    else:
+        raise ValueError(f"Unknown instrument {instrument!r}.")
+
+    if booldiag and not np.isfinite(noise).all():
+        raise ValueError(f"Non-finite photometric noise encountered for {instrument!r}.")
+
+    if is_scalar:
+        return float(noise[0])
+    return noise
+
+
+retr_noisphot = photometric_noise

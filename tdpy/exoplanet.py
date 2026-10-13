@@ -780,6 +780,20 @@ def retr_vesc(
     return escape_velocity_earth * np.sqrt(np.asarray(massplan) / np.asarray(radicomp))
 
 
+def keplerian_orbital_speed(
+    stellar_mass_solar: float | np.ndarray,
+    semimajor_axis_au: float | np.ndarray,
+) -> float | np.ndarray:
+    """Return circular Keplerian orbital speed in km/s."""
+
+    gravitational_constant_au_km = 887.129  # [AU (km/s)^2 / M_sun]
+    return np.sqrt(gravitational_constant_au_km * np.asarray(stellar_mass_solar) / np.asarray(semimajor_axis_au))
+
+
+retr_vorbkepl = keplerian_orbital_speed
+retr_vorb = keplerian_orbital_speed
+
+
 def retr_rs2a(
     rsmacomp: float | np.ndarray,
     rrat: float | np.ndarray,
@@ -1221,5 +1235,206 @@ def retr_listcolrcomp(number_companions: int) -> np.ndarray:
     return np.array(colors[:number_companions])
 
 
+def solar_system_planets() -> dict[str, np.ndarray]:
+    """Return dictionary of Solar System planet names, semi-major axes [AU], masses [M_Earth], and radii [R_Earth]."""
+    radii_km = np.array([2440.0, 6052.0, 6371.0, 3390.0, 69911.0, 58232.0, 25362.0, 24622.0])
+    return {
+        "name": np.array(["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune"]),
+        "smax": np.array([0.3870993, 0.723336, 1.0, 1.52371, 5.2029, 9.537, 19.189, 30.0699]),
+        "mass": np.array([0.05527, 0.81500, 1.0, 0.10745, 317.83, 95.159, 14.500, 17.204]),
+        "radi": radii_km / radii_km[2],
+    }
+
+
+retr_dictsols = solar_system_planets
 retr_rvelsema = keplerian_semi_amplitude
 retr_rvel = keplerian_orbit_radial_velocity
+
+
+def companion_flux_dilution(
+    target_temperature_k: float,
+    companion_temperature_k: float,
+    wavelength_min_microns: float = 0.6,
+    wavelength_max_microns: float = 1.0,
+    number_wavelengths: int = 50,
+) -> float:
+    """Calculate photometric dilution factor 1 - F_target / (F_target + F_companion) across a bandpass."""
+    from .spectral import blackbody_flux_wavelength
+
+    binswlen = np.linspace(wavelength_min_microns, wavelength_max_microns, number_wavelengths)
+    meanwlen = 0.5 * (binswlen[1:] + binswlen[:-1])
+    diffwlen = 0.5 * (binswlen[1:] - binswlen[:-1])
+
+    fluxspectarg = blackbody_flux_wavelength(target_temperature_k, meanwlen)
+    fluxtarg = float(np.sum(diffwlen * fluxspectarg))
+
+    fluxspeccomp = blackbody_flux_wavelength(companion_temperature_k, meanwlen)
+    fluxcomp = float(np.sum(diffwlen * fluxspeccomp))
+
+    return 1.0 - fluxtarg / (fluxtarg + fluxcomp)
+
+
+def retr_dilu(target_temperature_k, companion_temperature_k, strgwlentype="tess"):
+    """Compatibility wrapper for companion_flux_dilution."""
+    if strgwlentype != "tess":
+        raise ValueError(f"Unsupported wavelength band {strgwlentype!r}.")
+    return companion_flux_dilution(target_temperature_k, companion_temperature_k, 0.6, 1.0)
+
+
+def retr_rflxmodlrise(
+    time: float | np.ndarray,
+    timerise: float,
+    coeflinerise: float,
+    coefquadrise: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Calculate relative flux and excess flux for a quadratic post-rise profile."""
+    time = np.asarray(time, dtype=float)
+    timeoffs = time - timerise
+    dflxrise = np.zeros_like(time)
+    indxpost = np.where(timeoffs > 0.0)[0]
+    dflxrise[indxpost] = coeflinerise * timeoffs[indxpost] + coefquadrise * timeoffs[indxpost]**2
+    return 1.0 + dflxrise, dflxrise
+
+
+def transit_epochs(
+    time: float | np.ndarray,
+    epoch_days: float,
+    period_days: float,
+    duration_hours: float | None = None,
+    *,
+    epoc: float | None = None,
+    peri: float | None = None,
+    duratrantotl: float | None = None,
+    booldiag: bool = True,
+) -> np.ndarray:
+    """Return integer transit epoch numbers occurring within the time range."""
+    if epoc is not None:
+        epoch_days = epoc
+    if peri is not None:
+        period_days = peri
+    if duratrantotl is not None:
+        duration_hours = duratrantotl
+
+    time_arr = np.asarray(time, dtype=float)
+    if not np.isfinite(period_days) or period_days <= 0.0:
+        return np.arange(1, dtype=int)
+    duration_offset = (duration_hours / 48.0) if duration_hours is not None else 0.0
+    min_epoch = int(np.ceil((np.amin(time_arr) - epoch_days - duration_offset) / period_days))
+    max_epoch = int(np.ceil((np.amax(time_arr) - epoch_days - duration_offset) / period_days))
+    return np.arange(min_epoch, max_epoch, dtype=int)
+
+
+retr_indxtran = transit_epochs
+
+
+def transit_times(
+    time: float | np.ndarray,
+    epoch_days: float,
+    period_days: float,
+    duration_hours: float | None = None,
+    *,
+    epoc: float | None = None,
+    peri: float | None = None,
+    duratrantotl: float | None = None,
+) -> np.ndarray:
+    """Return predicted transit times occurring within the time range."""
+    epochs = transit_epochs(time, epoch_days, period_days, duration_hours, epoc=epoc, peri=peri, duratrantotl=duratrantotl)
+    p = peri if peri is not None else period_days
+    t0 = epoc if epoc is not None else epoch_days
+    return t0 + epochs * p
+
+
+retr_listepoctran = transit_times
+
+
+def transit_time_indices(
+    time: float | np.ndarray,
+    epoch_days: float,
+    period_days: float,
+    duration_hours: float,
+    duration_full_hours: float | None = None,
+    phase_interval: str | None = None,
+    individual_transits: bool = False,
+    out_of_transit: bool = False,
+    secondary: bool = False,
+    *,
+    epoc: float | None = None,
+    peri: float | None = None,
+    duratrantotl: float | None = None,
+    duratranfull: float | None = None,
+    typeineg: str | None = None,
+    boolindi: bool = False,
+    booloutt: bool = False,
+    boolseco: bool = False,
+) -> np.ndarray | list[np.ndarray]:
+    """Return indices of timestamps falling in or out of transit windows."""
+    if epoc is not None:
+        epoch_days = epoc
+    if peri is not None:
+        period_days = peri
+    if duratrantotl is not None:
+        duration_hours = duratrantotl
+    if duratranfull is not None:
+        duration_full_hours = duratranfull
+    if typeineg is not None:
+        phase_interval = typeineg
+    if boolindi:
+        individual_transits = boolindi
+    if booloutt:
+        out_of_transit = booloutt
+    if boolseco:
+        secondary = boolseco
+
+    time_arr = np.asarray(time, dtype=float)
+    epochs = transit_epochs(time_arr, epoch_days, period_days, duration_hours)
+    offset = 0.5 if secondary else 0.0
+
+    half_duration_days = duration_hours / 48.0
+    full_half_duration_days = (duration_full_hours / 48.0) if duration_full_hours is not None else None
+
+    indices_list = []
+    for n in epochs:
+        center = epoch_days + (n + offset) * period_days
+        t_start = center - half_duration_days
+        t_end = center + half_duration_days
+        if full_half_duration_days is not None:
+            t_full_start = center - full_half_duration_days
+            t_full_end = center + full_half_duration_days
+            t_ingr_mid = 0.5 * (t_start + t_full_start)
+            t_eggr_mid = 0.5 * (t_end + t_full_end)
+            if phase_interval == "inge":
+                idx = np.where(((time_arr > t_start) & (time_arr < t_full_start)) | ((time_arr > t_full_end) & (time_arr < t_end)))[0]
+            elif phase_interval == "ingr":
+                idx = np.where((time_arr > t_start) & (time_arr < t_full_start))[0]
+            elif phase_interval == "eggr":
+                idx = np.where((time_arr > t_full_end) & (time_arr < t_end))[0]
+            elif phase_interval == "ingrinit":
+                idx = np.where((time_arr > t_start) & (time_arr < t_ingr_mid))[0]
+            elif phase_interval == "ingrfinl":
+                idx = np.where((time_arr > t_ingr_mid) & (time_arr < t_full_start))[0]
+            elif phase_interval == "eggrinit":
+                idx = np.where((time_arr > t_full_end) & (time_arr < t_eggr_mid))[0]
+            elif phase_interval == "eggrfinl":
+                idx = np.where((time_arr > t_eggr_mid) & (time_arr < t_end))[0]
+            else:
+                idx = np.where((time_arr > t_start) & (time_arr < t_end))[0]
+        else:
+            idx = np.where((time_arr > t_start) & (time_arr < t_end))[0]
+
+        if idx.size > 0:
+            indices_list.append(idx)
+
+    if individual_transits:
+        return indices_list
+
+    if len(indices_list) > 0:
+        transit_indices = np.unique(np.concatenate(indices_list))
+    else:
+        transit_indices = np.array([], dtype=int)
+
+    if out_of_transit:
+        return np.setdiff1d(np.arange(time_arr.size), transit_indices)
+    return transit_indices
+
+
+retr_indxtimetran = transit_time_indices

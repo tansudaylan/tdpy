@@ -55,7 +55,7 @@ def save_figure(
     path = plot_file_path(path, typefileplot)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
 
-    if getattr(figure, "axes", None):
+    if getattr(figure, "axes", None) and getattr(figure, "get_layout_engine", lambda: None)() is None:
         figure.subplots_adjust(
             left=0.12,
             right=0.98,
