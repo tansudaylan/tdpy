@@ -13,7 +13,6 @@ import warnings
 
 # packages whose own numerical and plotting warnings are silenced together with their printing
 LISTNAMEPACK = [
-    "assos",
     "chalcedon",
     "darkinferno",
     "ephesos",

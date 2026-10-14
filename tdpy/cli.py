@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 
 def add_plot_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -23,3 +23,14 @@ def parse_plot_arguments(
 
     parser = add_plot_arguments(argparse.ArgumentParser(description=description))
     return parser.parse_args(arguments)
+
+
+def run_plot_cli(
+    runner: Callable[[str], object],
+    description: str | None = None,
+    arguments: Sequence[str] | None = None,
+) -> int:
+    """Run a plot example with the shared command-line output-format option."""
+    options = parse_plot_arguments(description=description, arguments=arguments)
+    runner(options.typefileplot)
+    return 0

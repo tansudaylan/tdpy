@@ -1,7 +1,7 @@
 import pytest
 import tdpy
 
-from tdpy.cli import add_plot_arguments, parse_plot_arguments
+from tdpy.cli import add_plot_arguments, parse_plot_arguments, run_plot_cli
 
 
 def test_parse_plot_arguments_defaults_to_png():
@@ -26,6 +26,16 @@ def test_add_plot_arguments_composes_with_existing_options():
 
     assert arguments.typefileplot == "pdf"
     assert arguments.quick is True
+
+
+def test_run_plot_cli_forwards_output_format():
+    calls = []
+
+    def run(typefileplot):
+        calls.append(typefileplot)
+
+    assert run_plot_cli(run, arguments=["--typefileplot", "pdf"]) == 0
+    assert calls == ["pdf"]
 
 
 def test_dispatch_cli_forwards_arguments():

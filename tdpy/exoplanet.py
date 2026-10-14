@@ -157,6 +157,23 @@ def quadratic_limb_darkened_stellar_grid(
     return image_x, image_y, radial_distance, stellar_brightness
 
 
+def solve_kepler_equation(mean_anomaly, eccentricity):
+    """Solve E - e sin(E) = M using the maintained Newton iteration.
+
+    Anomalies use radians, eccentricity is dimensionless, and inputs
+    broadcast. The mean anomaly is not wrapped, preserving orbital cycles.
+    """
+    mean_anomaly = np.asarray(mean_anomaly, dtype=float)
+    eccentricity = np.asarray(eccentricity, dtype=float)
+    eccentric_anomaly = mean_anomaly + eccentricity * np.sin(mean_anomaly)
+    for _ in range(100):
+        residual = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly) - mean_anomaly
+        eccentric_anomaly = eccentric_anomaly - residual / (1.0 - eccentricity * np.cos(eccentric_anomaly))
+        if np.all(np.abs(residual) < 1e-12):
+            return eccentric_anomaly
+    raise RuntimeError("Kepler solver did not converge.")
+
+
 def keplerian_radial_velocity(
     time: np.ndarray,
     period: float | np.ndarray,
@@ -176,15 +193,7 @@ def keplerian_radial_velocity(
     eccentricity = np.asarray(eccentricity, dtype=float)
     mean_anomaly = mean_anomaly_reference + 2.0 * np.pi * (np.asarray(time) - time_reference) / period
 
-    # Newton iterations on Kepler's equation for the eccentric anomaly
-    eccentric_anomaly = mean_anomaly + eccentricity * np.sin(mean_anomaly)
-    for _ in range(100):
-        residual = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly) - mean_anomaly
-        eccentric_anomaly = eccentric_anomaly - residual / (1.0 - eccentricity * np.cos(eccentric_anomaly))
-        if np.all(np.abs(residual) < 1e-12):
-            break
-    else:
-        raise RuntimeError("Kepler solver did not converge.")
+    eccentric_anomaly = solve_kepler_equation(mean_anomaly, eccentricity)
     true_anomaly = 2.0 * np.arctan2(
         np.sqrt(1.0 + eccentricity) * np.sin(eccentric_anomaly / 2.0),
         np.sqrt(1.0 - eccentricity) * np.cos(eccentric_anomaly / 2.0),
@@ -682,6 +691,19 @@ def plot_exoplanet_period_radius(
     return output_path
 
 
+def orbital_phase(time, period, epoch=0.0, *, center=0.5, time_units=False):
+    """Fold times into [center - 0.5, center + 0.5) without sorting.
+
+    Time, period, and epoch must use the same units. The epoch has phase
+    zero modulo one. ``time_units=True`` scales the phase by the period.
+    Scalar and array inputs retain their shape.
+    """
+    initial_phase = ((np.asarray(time) - epoch) % period) / period
+    shift = 0.5 - center
+    phase = (initial_phase + shift) % 1.0 - shift
+    return phase * period if time_units else phase
+
+
 def fold_tser(
     arry: np.ndarray,
     epoc: float,
@@ -703,12 +725,7 @@ def fold_tser(
 
     arryfold = np.empty_like(arry)
 
-    phasinit = ((time - epoc) % peri) / peri
-    phasdiff = 0.5 - phascntr
-    xdat = (phasinit + phasdiff) % 1.0 - phasdiff
-
-    if boolxdattime:
-        xdat *= peri
+    xdat = orbital_phase(time, peri, epoc, center=phascntr, time_units=boolxdattime)
 
     if arry.ndim == 3:
         arryfold[:, 0, 0] = xdat

@@ -1,7 +1,36 @@
 import numpy as np
 import pytest
 
-from tdpy.population import partition_classified_population, subset_population
+from tdpy.population import partition_classified_population, population_feature_values, subset_population
+
+
+def test_population_feature_values_preserves_nested_arrays_and_metadata():
+    values = np.array([1.0, 2.0])  # [kg]
+    labeled = {
+        "mass": [values, "kg"],
+        "nested": {"mask": [np.array([True, False]), []], "raw": values},
+        "label": "Toy population",
+        "metadata": ["first", "second", "third"],
+        "tuple": ("first", "second"),
+        "count": 2,
+    }
+    flattened = population_feature_values(labeled)
+    assert flattened is not labeled
+    assert flattened["mass"] is values
+    assert flattened["nested"] is not labeled["nested"]
+    assert flattened["nested"]["mask"] is labeled["nested"]["mask"][0]
+    assert flattened["nested"]["raw"] is values
+    assert flattened["metadata"] is labeled["metadata"]
+    assert flattened["tuple"] is labeled["tuple"]
+    assert flattened["label"] == "Toy population"
+    assert flattened["count"] == 2
+    assert labeled["mass"][1] == "kg"
+    assert len(labeled["nested"]["mask"]) == 2
+
+
+def test_population_feature_values_retains_empty_population_and_features():
+    assert population_feature_values({}) == {}
+    assert population_feature_values({"empty": []}) == {"empty": []}
 
 
 def test_partition_classified_population():

@@ -3,8 +3,120 @@
 from collections.abc import Callable
 
 import numpy as np
+from scipy.integrate import trapezoid
+from scipy.interpolate import RectBivariateSpline
 from scipy.special import erf, erfinv
-from scipy.stats import chi2, invgamma, ncx2
+from scipy.stats import chi2, gaussian_kde, invgamma, ncx2
+
+
+def build_kde_prior_from_samples(samples, low=None, high=None, bandwidth=None,
+                                 grid_size=4096, *, normalization="trapezoid"):
+    """Build density and inverse-CDF grids for a one-dimensional KDE prior.
+
+    Nonfinite samples are discarded. The CDF uses cumulative grid masses,
+    matching the Roman samplers. ``normalization='rectangle'`` retains the
+    nested sampler's rectangular density normalization.
+    """
+    samples = np.asarray(samples, dtype=float).reshape(-1)
+    samples = samples[np.isfinite(samples)]
+    if samples.size < 2:
+        raise ValueError("KDE prior requires at least 2 finite samples.")
+    if int(grid_size) < 256:
+        raise ValueError("KDE prior grid_size must be at least 256.")
+    if normalization not in ("trapezoid", "rectangle"):
+        raise ValueError("KDE prior normalization must be 'trapezoid' or 'rectangle'.")
+
+    sample_std = float(np.std(samples, ddof=1))
+    sample_range = float(np.max(samples) - np.min(samples))
+    padding_scale = 3.0 * (sample_std if sample_std > 0.0 else max(sample_range, 1.0))
+    domain_low = float(low) if low is not None else float(np.min(samples) - padding_scale)
+    domain_high = float(high) if high is not None else float(np.max(samples) + padding_scale)
+    if not np.isfinite(domain_low) or not np.isfinite(domain_high) or domain_high <= domain_low:
+        raise ValueError("KDE prior bounds must define a finite interval with high > low.")
+
+    kde = gaussian_kde(samples, **({} if bandwidth is None else {"bw_method": float(bandwidth)}))
+    x_grid = np.linspace(domain_low, domain_high, int(grid_size), dtype=float)
+    pdf = np.clip(np.asarray(kde(x_grid), dtype=float), 0.0, None)
+    dx = float(x_grid[1] - x_grid[0])
+    integral = float(trapezoid(pdf, x_grid) if normalization == "trapezoid" else np.sum(pdf) * dx)
+    if not np.isfinite(integral) or integral <= 0.0:
+        raise ValueError("KDE prior produced a non-finite or zero integral over the sampling domain.")
+
+    pdf /= integral
+    cdf = np.cumsum(pdf) * dx
+    cdf[0] = 0.0
+    cdf[-1] = 1.0
+    unique_cdf, unique_idx = np.unique(cdf, return_index=True)
+    if unique_cdf.size < 2:
+        raise ValueError("KDE prior CDF is degenerate; broaden bounds or use different samples.")
+    return {
+        "kind": "kde",
+        "x_grid": x_grid,
+        "pdf_grid": pdf,
+        "cdf_grid": unique_cdf,
+        "cdf_x_grid": x_grid[unique_idx],
+        "low": domain_low,
+        "high": domain_high,
+        "bandwidth": None if bandwidth is None else float(bandwidth),
+        "grid_size": int(grid_size),
+        "n_samples": int(samples.size),
+    }
+
+
+def prepare_kde_prior_spec(spec, custom_prior_samples=None, *,
+                           prior_builder=build_kde_prior_from_samples,
+                           pipeline_name="sampling pipeline"):
+    """Copy a parameter spec and resolve its sample-derived KDE grids.
+
+    Sample entries may be arrays or dictionaries with ``samples`` plus
+    bandwidth, grid_size, low, and high overrides. A supplied builder retains
+    the consumer's grid convention without storing callbacks in the result.
+    """
+    prepared = dict(spec)
+    parameter_name = str(prepared.get("name", "")).strip()
+    kind = str(prepared.get("custom_kind", prepared.get("prior_kind", "kde"))).strip().lower()
+    if kind != "kde":
+        raise ValueError(f"Unsupported custom prior kind '{kind}' for {prepared.get('name', '?')}.")
+    custom_prior_samples = {} if custom_prior_samples is None else custom_prior_samples
+    if parameter_name not in custom_prior_samples:
+        raise ValueError(
+            f"Custom KDE prior for parameter {prepared.get('name', '?')} requires an entry in "
+            f"custom_prior_samples passed to {pipeline_name}."
+        )
+    sample_input = custom_prior_samples[parameter_name]
+    overrides = sample_input if isinstance(sample_input, dict) else {"samples": sample_input}
+    if "samples" not in overrides:
+        raise ValueError(f"custom_prior_samples['{parameter_name}'] must contain a 'samples' entry.")
+    kind = str(overrides.get("custom_kind", kind)).strip().lower()
+    if kind != "kde":
+        raise ValueError(f"Unsupported custom prior kind '{kind}' for {prepared.get('name', '?')}.")
+    samples = np.asarray(overrides["samples"], dtype=float).reshape(-1)
+    samples = samples[np.isfinite(samples)]
+    if samples.size < 2:
+        raise ValueError(
+            f"Custom KDE prior for parameter {prepared.get('name', '?')} requires at least 2 finite samples."
+        )
+    defaults = {"low": None, "high": None, "bandwidth": None, "grid_size": 4096}
+    options = {
+        name: overrides.get(name, prepared.get(name, default))
+        for name, default in defaults.items()
+    }
+    prior_data = prior_builder(samples, **options)
+    grid_fields = ("bandwidth", "grid_size", "low", "high", "x_grid", "pdf_grid", "cdf_grid", "cdf_x_grid")
+    prepared.update({name: prior_data[name] for name in grid_fields if name in prior_data})
+    prepared["custom_kind"] = kind
+    return prepared
+
+
+def prepare_parameter_prior_specs(param_specs, custom_prior_samples=None, *,
+                                  prepare_custom_prior=prepare_kde_prior_spec):
+    """Copy ordinary parameter specs and precompute custom prior metadata."""
+    return [
+        prepare_custom_prior(spec, custom_prior_samples=custom_prior_samples)
+        if str(spec.get("prior_type", "uniform")).strip().lower() == "custom"
+        else dict(spec)
+        for spec in param_specs
+    ]
 
 
 def cdfn_self(value, minimum, maximum):
@@ -170,6 +282,79 @@ def rescale_range(data, old_min, old_max, new_min, new_max):
 
 
 range_shift = rescale_range
+
+
+class RectilinearInterpolator2D:
+    """Interpolate a finite rectangular grid with explicit coordinate ordering.
+
+    One-dimensional axes use values shaped (len(y), len(x)). Aligned 2D
+    mesh coordinates may use either NumPy meshgrid indexing convention.
+    Calls use Cartesian products by default; ``grid=False`` evaluates paired,
+    broadcastable coordinates. Samples outside the grid use ``fill_value``;
+    ``None`` retains the spline engine's boundary extension.
+    """
+
+    def __init__(self, x_coordinates, y_coordinates, values, *, degree=3, fill_value=0.0):
+        x_coordinates, y_coordinates, values = (
+            np.asarray(array, dtype=float) for array in (x_coordinates, y_coordinates, values)
+        )
+        if x_coordinates.size == 0 or y_coordinates.size == 0:
+            raise ValueError("coordinate grids must not be empty")
+        if x_coordinates.ndim == y_coordinates.ndim == 2 and x_coordinates.shape == y_coordinates.shape == values.shape:
+            shape = x_coordinates.shape
+            if (np.array_equal(x_coordinates, np.broadcast_to(x_coordinates[0, :], shape))
+                    and np.array_equal(y_coordinates, np.broadcast_to(y_coordinates[:, 0, None], shape))):
+                x_coordinates, y_coordinates = x_coordinates[0, :], y_coordinates[:, 0]
+            elif (np.array_equal(x_coordinates, np.broadcast_to(x_coordinates[:, 0, None], shape))
+                    and np.array_equal(y_coordinates, np.broadcast_to(y_coordinates[0, :], shape))):
+                x_coordinates, y_coordinates, values = x_coordinates[:, 0], y_coordinates[0, :], values.T
+            else:
+                raise ValueError("mesh coordinates must describe a rectangular grid")
+        if x_coordinates.ndim != 1 or y_coordinates.ndim != 1 or values.shape != (y_coordinates.size, x_coordinates.size):
+            raise ValueError("values must match the rectangular x/y coordinate grid")
+        if (not np.isfinite(x_coordinates).all() or not np.isfinite(y_coordinates).all() or not np.isfinite(values).all()
+                or np.any(np.diff(x_coordinates) <= 0.0) or np.any(np.diff(y_coordinates) <= 0.0)):
+            raise ValueError("grid values must be finite and axes strictly increasing")
+        if degree not in (1, 2, 3) or min(x_coordinates.size, y_coordinates.size) <= degree:
+            raise ValueError("degree must be 1, 2, or 3 with more grid samples than degree")
+        self.bounds = (x_coordinates[0], x_coordinates[-1], y_coordinates[0], y_coordinates[-1])
+        self.fill_value = fill_value
+        self.spline = RectBivariateSpline(x_coordinates, y_coordinates, values.T, kx=degree, ky=degree, s=0)
+
+    def __call__(self, x_coordinates, y_coordinates, *, grid=True):
+        x_coordinates, y_coordinates = np.asarray(x_coordinates, dtype=float), np.asarray(y_coordinates, dtype=float)
+        if grid:
+            if x_coordinates.ndim > 1 or y_coordinates.ndim > 1:
+                raise ValueError("grid evaluation requires scalar or one-dimensional coordinates")
+            x_coordinates, y_coordinates = np.meshgrid(np.atleast_1d(x_coordinates), np.atleast_1d(y_coordinates))
+        else:
+            x_coordinates, y_coordinates = np.broadcast_arrays(x_coordinates, y_coordinates)
+        values = self.spline.ev(x_coordinates.ravel(), y_coordinates.ravel()).reshape(x_coordinates.shape)
+        if self.fill_value is None:
+            return values
+        xmin, xmax, ymin, ymax = self.bounds
+        inside = (np.isfinite(x_coordinates) & np.isfinite(y_coordinates)
+                  & (x_coordinates >= xmin) & (x_coordinates <= xmax)
+                  & (y_coordinates >= ymin) & (y_coordinates <= ymax))
+        return np.where(inside, values, self.fill_value)
+
+
+def midpoint_bin_edges(coordinates):
+    """Infer edges from increasing samples using adjacent arithmetic midpoints.
+
+    Outer edges extend by half the first and last sample separations. Input
+    and output coordinates use the same units; irregular spacing is retained.
+    """
+    coordinates = np.asarray(coordinates, dtype=float)
+    if coordinates.ndim != 1 or coordinates.size < 2:
+        raise ValueError("coordinates must be a 1D array with at least two samples")
+    if not np.isfinite(coordinates).all() or np.any(np.diff(coordinates) <= 0.0):
+        raise ValueError("coordinates must be finite and strictly increasing")
+    edges = np.empty(coordinates.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (coordinates[:-1] + coordinates[1:])
+    edges[0] = coordinates[0] - 0.5 * (coordinates[1] - coordinates[0])
+    edges[-1] = coordinates[-1] + 0.5 * (coordinates[-1] - coordinates[-2])
+    return edges
 
 
 def bin_spectrum(
@@ -483,6 +668,19 @@ def weighted_linear_regression(
 
 
 retr_mlikregr = weighted_linear_regression
+
+
+def robust_scatter(values, axis=None, scale=1.4826):
+    """Return scaled median absolute deviation, ignoring masked/nonfinite values.
+
+    The output uses the input's units. The dimensionless default scale is the
+    existing approximate Gaussian scatter conversion; all-invalid slices
+    return NaN without warnings.
+    """
+    masked = np.ma.masked_invalid(np.ma.asarray(values, dtype=float))
+    center = np.ma.median(masked, axis=axis, keepdims=True)
+    deviation = np.ma.median(np.ma.abs(masked - center), axis=axis)
+    return np.ma.filled(scale * deviation, np.nan)
 
 
 def weighted_quantile(

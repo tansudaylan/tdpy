@@ -8,6 +8,24 @@ from typing import Any
 import numpy as np
 
 
+def population_feature_values(population):
+    """Copy nested feature dictionaries, unwrapping legacy [values, label] lists.
+
+    In this labeled-population format, every two-element list is a feature
+    entry. Arrays and other metadata are retained by reference, matching the
+    historical raw-value aliases without modifying the labeled dictionary.
+    """
+    result = {}
+    for name, feature in population.items():
+        if isinstance(feature, list) and len(feature) == 2:
+            result[name] = feature[0]
+        elif isinstance(feature, dict):
+            result[name] = population_feature_values(feature)
+        else:
+            result[name] = feature
+    return result
+
+
 def subset_population(
     populations: MutableMapping[str, dict[str, list[Any]]],
     source_name: str,

@@ -49,6 +49,38 @@ from tdpy.exoplanet import (
 )
 
 
+def test_kepler_equation_preserves_cycles_and_broadcasts():
+    from tdpy.exoplanet import solve_kepler_equation
+
+    mean_anomaly = np.linspace(-4.0 * np.pi, 4.0 * np.pi, 101)[:, None]  # [rad]
+    eccentricity = np.array([0.0, 0.3, 0.7, 0.85])
+    solved = solve_kepler_equation(mean_anomaly, eccentricity)
+    assert solved.shape == (101, 4)
+    np.testing.assert_allclose(solved - eccentricity * np.sin(solved), np.broadcast_to(mean_anomaly, solved.shape), atol=1e-12)
+    np.testing.assert_array_equal(solved[:, 0], mean_anomaly[:, 0])
+    assert solve_kepler_equation(0.0, 0.7) == 0.0
+    np.testing.assert_array_equal(solved[0], np.full(4, -4.0 * np.pi))
+    np.testing.assert_array_equal(solved[-1], np.full(4, 4.0 * np.pi))
+
+
+def test_kepler_equation_matches_original_iteration_without_mutating_inputs():
+    from tdpy.exoplanet import solve_kepler_equation
+
+    mean_anomaly = np.array([-1.8, -0.2, 0.0, 0.3, 2.8, 7.0])  # [rad]
+    eccentricity = np.array([0.1, 0.7, 0.8, 0.6, 0.3, 0.5])
+    original_mean = mean_anomaly.copy()
+    original_eccentricity = eccentricity.copy()
+    expected = mean_anomaly + eccentricity * np.sin(mean_anomaly)
+    for _ in range(100):
+        residual = expected - eccentricity * np.sin(expected) - mean_anomaly
+        expected -= residual / (1.0 - eccentricity * np.cos(expected))
+        if np.all(np.abs(residual) < 1e-12):
+            break
+    np.testing.assert_array_equal(solve_kepler_equation(mean_anomaly, eccentricity), expected)
+    np.testing.assert_array_equal(mean_anomaly, original_mean)
+    np.testing.assert_array_equal(eccentricity, original_eccentricity)
+
+
 def test_keplerian_radial_velocity_reduces_to_a_sinusoid_for_circular_orbits():
     time = np.linspace(0.0, 30.0, 200)  # [day]
     velocity = keplerian_radial_velocity(time, 7.0, 3.0, 0.0, 0.4, 1.1)
@@ -167,6 +199,39 @@ def test_kepler_third_law_round_trip():
     semi_major_axis = retr_smaxkepl(period, mass)
     recovered_period = retr_perikepl(semi_major_axis, mass)
     assert recovered_period == pytest.approx(period, rel=1e-10)
+
+
+@pytest.mark.parametrize("center", [0.0, 0.25, 0.5])
+@pytest.mark.parametrize("time_units", [False, True])
+def test_orbital_phase_preserves_fold_tser_wrapping(center, time_units):
+    from tdpy.exoplanet import orbital_phase
+
+    time = np.array([[0.0, -3.0, 3.0], [1.5, -1.5, 8.0]])  # [day]
+    period = 3.0  # [day]
+    epoch = 0.3  # [day]
+    initial = ((time - epoch) % period) / period
+    shift = 0.5 - center
+    expected = (initial + shift) % 1.0 - shift
+    if time_units:
+        expected *= period
+    np.testing.assert_array_equal(
+        orbital_phase(time, period, epoch, center=center, time_units=time_units), expected,
+    )
+    assert np.ndim(orbital_phase(1.5, period, epoch, center=center)) == 0
+    flattened = time.ravel()
+    data = np.column_stack((flattened, np.arange(flattened.size), np.ones(flattened.size)))
+    folded = fold_tser(data, epoch, period, boolsort=False, phascntr=center, boolxdattime=time_units)
+    np.testing.assert_array_equal(folded[:, 0], expected.ravel())
+    np.testing.assert_array_equal(folded[:, 1:], data[:, 1:])
+
+
+def test_orbital_phase_boundaries_and_epoch_shift():
+    from tdpy.exoplanet import orbital_phase
+
+    time = np.array([-3.0, -1.5, 0.0, 1.5, 3.0])  # [day]
+    np.testing.assert_array_equal(orbital_phase(time, 3.0, center=0.0), [0.0, -0.5, 0.0, -0.5, 0.0])
+    np.testing.assert_array_equal(orbital_phase(time, 3.0), [0.0, 0.5, 0.0, 0.5, 0.0])
+    np.testing.assert_array_equal(orbital_phase(time, 3.0, epoch=1.5), [0.5, 0.0, 0.5, 0.0, 0.5])
 
 
 def test_fold_tser_wraps_and_sorts_phase():
