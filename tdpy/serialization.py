@@ -30,6 +30,23 @@ def write_json(path: str | Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
+def write_bytes(path: str | Path, content: bytes) -> None:
+    """Write binary content with narration, creating missing parent directories."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Writing to {path}...")
+    path.write_bytes(content)
+
+
+def write_fits(path: str | Path, data: Any, *, header: Any = None, overwrite: bool = False) -> None:
+    """Write a FITS array with narration and explicit overwrite opt-in."""
+    from astropy.io import fits
+
+    path = Path(path)
+    print(f"Writing to {path}...")
+    fits.writeto(path, data, header=header, overwrite=overwrite)
+
+
 def summarize_json_value(value: Any) -> Any:
     """Return compact JSON-safe metadata without retaining large arrays."""
     if isinstance(value, np.ndarray):

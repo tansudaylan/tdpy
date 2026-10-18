@@ -2,11 +2,23 @@
 
 from collections.abc import Callable
 
+from astropy.stats import gaussian_fwhm_to_sigma as _gaussian_fwhm_to_sigma
 import numpy as np
 from scipy.integrate import trapezoid
 from scipy.interpolate import RectBivariateSpline
 from scipy.special import erf, erfinv
+from scipy.special import logsumexp as _logsumexp
 from scipy.stats import chi2, gaussian_kde, invgamma, ncx2
+from scipy.stats import norm as _norm
+
+
+def gaussian_sigma_from_fwhm(fwhm):
+    """Convert Gaussian full width at half maximum to sigma in the input units.
+
+    Scalars, arrays, masked arrays, and Astropy quantities retain their shape
+    and units. Validation of physically positive widths belongs to the caller.
+    """
+    return np.asanyarray(fwhm) * _gaussian_fwhm_to_sigma
 
 
 def build_kde_prior_from_samples(samples, low=None, high=None, bandwidth=None,
@@ -207,6 +219,29 @@ def pdfn_gaus(value, mean, standard_deviation):
     )
 
 
+def logmeanexp(log_values, axis=None, *, keepdims=False):
+    """Return the log of a mean in linear space without exponent overflow.
+
+    Reduction axes and retained dimensions follow SciPy's ``logsumexp``.
+    Inputs must contain at least one value.
+    """
+    values = np.asarray(log_values, dtype=float)
+    if values.size == 0:
+        raise ValueError("Cannot average an empty set of log values")
+    total = _logsumexp(values, axis=axis, keepdims=keepdims)
+    count = values.size // np.size(total)
+    return total - np.log(count)
+
+
+def logpdf_gaus(value, mean, standard_deviation):
+    """Return normalized Gaussian log densities without density underflow.
+
+    Inputs broadcast as in SciPy's normal distribution. Values, means, and
+    standard deviations must be expressed in the same units.
+    """
+    return _norm.logpdf(value, loc=mean, scale=standard_deviation)
+
+
 def pdfn_lnor(value, mean, standard_deviation):
     """Return the log-normal probability density."""
     return pdfn_gaus(np.log(value), np.log(mean), standard_deviation)
@@ -369,6 +404,32 @@ def bin_spectrum(
         selected = np.abs(wavelength - center) < half_width
         binned[index] = np.mean(values[selected])
     return binned
+
+
+def grouped_polynomial_design_matrix(coordinates, groups, degree=1, *, normalize=False):
+    """Build centered polynomial columns for each sorted group label.
+
+    Columns are ordered by group, then by increasing power starting at zero.
+    Each column vanishes outside its group. With ``normalize=True``, centered
+    coordinates are divided by the group's coordinate range.
+    """
+    coordinates, groups = np.asarray(coordinates, dtype=float), np.asarray(groups)
+    if coordinates.ndim != 1 or groups.shape != coordinates.shape or coordinates.size == 0:
+        raise ValueError("coordinates and groups must be nonempty matching 1D arrays")
+    if not isinstance(degree, (int, np.integer)) or degree < 0:
+        raise ValueError("degree must be a nonnegative integer")
+    columns = []
+    for group in np.unique(groups):
+        selected = groups == group
+        if normalize:
+            centered = np.zeros_like(coordinates)
+            centered[selected] = (coordinates[selected] - coordinates[selected].mean()) / np.ptp(coordinates[selected])
+        else:
+            centered = np.where(selected, coordinates - coordinates[selected].mean(), 0.)
+        columns.append(selected.astype(float))
+        for power in range(1, degree + 1):
+            columns.append(np.where(selected, centered**power, 0.))
+    return np.column_stack(columns)
 
 
 def finite_difference_jacobian(
@@ -752,7 +813,7 @@ def grid_quantiles(
     if np.any(pdf_arr < 0.0) or not np.isfinite(pdf_arr).all():
         raise ValueError("probability_density must be finite and non-negative.")
 
-    total_prob = np.trapz(pdf_arr, grid_arr)
+    total_prob = trapezoid(pdf_arr, grid_arr)
     if total_prob <= 0.0:
         raise ValueError("probability_density must have positive integral.")
     normalized_pdf = pdf_arr / total_prob

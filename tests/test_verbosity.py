@@ -1,7 +1,28 @@
 import io
 import logging
+import sys
+from types import SimpleNamespace
 
+import tdpy
 import tdpy.verbosity as verbosity
+
+
+def test_resident_memory_reporting_uses_current_process_and_respects_verbosity(capsys, monkeypatch):
+    process = SimpleNamespace(
+        memory_info=lambda: SimpleNamespace(rss=2**20),
+        memory_percent=lambda: 12.5,
+    )
+    monkeypatch.setitem(sys.modules, 'psutil', SimpleNamespace(Process=lambda: process))
+
+    assert tdpy.retr_memoresi() == (2**20, 12.5)
+
+    monkeypatch.setenv('TDPY_VERBOSITY', '1')
+    assert tdpy.show_memo_simp() is None
+    assert capsys.readouterr().out == 'Resident memory: 1 MB, 12.5%\n'
+
+    monkeypatch.setenv('TDPY_VERBOSITY', '0')
+    assert tdpy.show_memo_simp() is None
+    assert capsys.readouterr().out == ''
 
 
 def test_print_is_silent_by_default_and_restored_by_the_environment(capsys, monkeypatch):

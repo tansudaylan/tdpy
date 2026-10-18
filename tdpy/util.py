@@ -34,6 +34,7 @@ import sklearn
 
 import astropy.units as u
 
+from .cli import dispatch_cli
 from .plotting import (
     normalize_plot_background,
     plot_background_colors,
@@ -42,6 +43,7 @@ from .plotting import (
     save_figure,
 )
 from .paths import RepositoryPaths, get_data_path
+from .serialization import write_fits
 
 
 def narrate(typeverb, message, level=1):
@@ -104,19 +106,6 @@ def periodic_score_event_count(amplitude, false_alarm=0.003, power=0.90):
     if np.any(amplitude <= 0):
         raise ValueError('amplitude must be positive')
     return (periodic_score_amplitude(1, false_alarm, power) / amplitude) ** 2
-
-
-def dispatch_cli(namespace, arguments=None, forward_arguments=True):
-    """Run a named callable from a module namespace using command-line arguments."""
-    arguments = sys.argv[1:] if arguments is None else list(arguments)
-    if not arguments:
-        raise SystemExit('A command name is required.')
-
-    command_name, *command_arguments = arguments
-    command = namespace.get(command_name)
-    if not callable(command) or command_name.startswith('_'):
-        raise SystemExit('Unknown command: %s' % command_name)
-    return command(*(command_arguments if forward_arguments else []))
 
 
 def wrap_ra_deg(ra_deg):
@@ -436,15 +425,6 @@ def calc_visitarg(rasctarg, decltarg, latiobvt, longobvt, strgtimeobvtyear, list
 
 
 # statistics
-def cdfn_self(parascal, minmpara, maxmpara):
-    '''
-    Return the CDF transform of a variable drawrn from the uniform distribution
-    '''
-    paraunit = (parascal - minmpara) / (maxmpara - minmpara)
-    
-    return paraunit
-
-
 def cdfn_powr(parascal, minm, maxm, slop):
         
     paraunit = (parascal**(1. - slop) - minm**(1. - slop)) / (maxm**(1. - slop) - minm**(1. - slop))
@@ -487,36 +467,9 @@ def cdfn_igam(parascal, slop, cutf):
     return paraunit
 
 
-def cdfn_expo(parascal, maxm, scal):
-    '''
-    Return the CDF transform of a variable drawrn from the exponential distribution
-    '''
-
-    paraunit = (1. - np.exp(-parascal / scal)) / (1. - np.exp(-maxm / scal))
-
-    return paraunit
-
-
-def cdfn_dexp(parascal, maxm, scal):
-    
-    if parascal < 0.:
-        paraunit = cdfn_expo(-parascal, maxm, scal)
-    else:
-        paraunit = cdfn_expo(parascal, maxm, scal)
-    
-    return paraunit
-
-
 def cdfn_lnor(parascal, meanpara, stdvpara):
    
     paraunit = cdfn_gaus(np.log(parascal), np.log(meanpara), stdvpara)
-    
-    return paraunit
-
-
-def cdfn_gaus(parascal, meanpara, stdvpara):
-   
-    paraunit = 0.5  * (1. + sp.special.erf((parascal - meanpara) / np.sqrt(2) / stdvpara))
     
     return paraunit
 
@@ -537,25 +490,11 @@ def cdfn_eerr(parascal, meanpara, stdvpara, paraunitnormminm, paraunitnormdiff):
     return paraunit
 
 
-def cdfn_logt(parascal, minmpara, maxmpara):
-    
-    paraunit = (np.log(parascal) - np.log(minmpara)) / (np.log(maxmpara) - np.log(minmpara))
-    
-    return paraunit
-
-
 def cdfn_atan(parascal, minmpara, maxmpara):
     
     paraunit = (np.arctan(parascal) - np.arctan(minmpara)) / (np.arctan(maxmpara) - np.arctan(minmpara))
     
     return paraunit
-
-
-def icdf_self(paraunit, minm, maxm):
-    
-    para = paraunit * (maxm - minm) + minm
-    
-    return para
 
 
 def icdf_powr(paraunit, minm, maxm, slop):
@@ -622,16 +561,6 @@ def icdf_dpow(paraunit, brek, sloplowr, slopuppr, minm=None, maxm=None):
     return para
 
 
-def icdf_dexp(paraunit, maxm, scal):
-    
-    if paraunit < 0.5:
-        icdf = -icdf_expo(2. * paraunit, maxm, scal)
-    else:
-        icdf = icdf_expo(2. * (paraunit - 0.5), maxm, scal)
-    
-    return icdf
-
-
 def icdf_igam(xdat, slop, cutf):
     
     icdf = sp.stats.invgamma.ppf(xdat, slop - 1., scale=cutf)
@@ -649,20 +578,6 @@ def icdf_lgau(paraunit, mean, stdv):
 def icdf_lnor(paraunit, meanpara, stdvpara):
     
     para = np.exp(icdf_gaus(paraunit, np.log(meanpara), stdvpara))
-
-    return para
-
-
-def icdf_gaus(paraunit, meanpara, stdvpara):
-    
-    para = meanpara + stdvpara * np.sqrt(2) * sp.special.erfinv(2. * paraunit - 1.)
-
-    return para
-
-
-def icdf_expo(paraunit, maxm, scal):
-
-    para = -scal * np.log(1. - paraunit * (1. - np.exp(-maxm / scal)))
 
     return para
 
@@ -2616,11 +2531,11 @@ def retr_galcfromequc(rasc, decl):
 
 def regr(xdat, ydat, ordr):
     
-    coef = polyfit(xdat, ydat, ordr)
-    func = poly1d(coef)
+    coef = np.polyfit(xdat, ydat, ordr)
+    func = np.poly1d(coef)
     strg = '$y = '
     if ordr == 0:
-        strg += '%.5g$'
+        strg += '%.5g$' % coef[0]
     if ordr == 1:
         strg += '%.5g x + %.5g$' % (coef[0], coef[1])
     if ordr == 2:
@@ -2663,6 +2578,14 @@ def corr_catl(lgalseco, bgalseco, lgalfrst, bgalfrst, anglassc=np.pi/180., typev
             print('%02d%% completed.' % thisfraccomp)
 
     return indxsecoassc
+
+
+def retr_memoresi():
+    """Return current process resident memory in bytes and percent of system RAM."""
+    import psutil
+
+    process = psutil.Process()
+    return process.memory_info().rss, process.memory_percent()
 
 
 def show_memo_simp():
@@ -2886,8 +2809,8 @@ def retr_mapsplnkfreq(indxpixloutprofi=None, numbsideoutp=256, indxfreqrofi=None
                 factconv = 1e6
             mapsplnk[k, :] *= factconv
         
-        pf.writeto(pathsbrt, mapsplnkfreq, clobber=True)
-        pf.writeto(pathsbrtstdv, mapsplnkfreqstdv, clobber=True)
+        write_fits(pathsbrt, mapsplnkfreq, overwrite=True)
+        write_fits(pathsbrtstdv, mapsplnkfreqstdv, overwrite=True)
         
     return mapsplnkfreq, mapsplnkfreqstdv
 
@@ -3357,8 +3280,6 @@ def plot_gene(path, xdat, ydat, yerr=None, scalxdat=None, scalydat=None, \
             axis.scatter(xdat, ydat, color=colr, alpha=alph, label=legd, s=2)
         elif plottype == 'kdee':
             raise Exception('To be implemented')
-            deltxdat = xdat[1] - xdat[0]
-            axis.bar(xdat - deltxdat / 2., ydat, deltxdat, color=colr, alpha=alph, label=legd)
         elif plottype == 'hist':
             deltxdat = xdat[1] - xdat[0]
             axis.bar(xdat - deltxdat / 2., ydat, deltxdat, color=colr, alpha=alph, label=legd)
@@ -3485,7 +3406,7 @@ def writ_sbrtfdfm(numbside=256, regitype='igal', binsenertype='full', recotype='
     sbrtfdfm = smth_ferm(sbrtfdfm[:, :, None], meanener, recotype)
 
     path = pathdata + 'sbrtfdfm%04d%s%s%s.fits' % (numbside, recotype, binsenertype, regitype)
-    pf.writeto(path, sbrtfdfm, clobber=True)
+    write_fits(path, sbrtfdfm, overwrite=True)
 
 
 def retr_strgtimestmp():
@@ -4683,9 +4604,7 @@ def retr_llik_corr(para, gdat):
     if np.any(variance <= 0.0):
         return -np.inf
     model = slope * gdat.tempfrst + intercept / np.sin(angle)
-    return -0.5 * np.sum(
-        (gdat.tempseco - model)**2 / variance + np.log(2.0 * np.pi * variance)
-    )
+    return np.sum(logpdf_gaus(gdat.tempseco, model, np.sqrt(variance)))
 
 
 
@@ -4701,14 +4620,18 @@ def retr_boolsubb(listtotl, listsubb):
     return boollygo
 
 
-def retr_matrrota(thet, \
-                  # Boolean indicating that the input is in radians
-                  boolradn=False, \
-                 ):
-    
-    matrrota = np.array([[np.cos(thet), np.sin(thet)], [np.sin(thet), np.cos(thet)]])
-    
-    return matrrota
+def retr_matrrota(thet, boolradn=False):
+    """Return counterclockwise 2D rotations, using degrees unless boolradn=True.
+
+    Array inputs retain the legacy layout ``(2, 2) + angle.shape``.
+    """
+    from scipy.spatial.transform import Rotation
+
+    angles = np.asarray(thet, dtype=float)
+    if angles.size == 0:
+        return np.empty((2, 2) + angles.shape)
+    matrices = Rotation.from_euler('z', angles.reshape(-1, 1), degrees=not boolradn).as_matrix()[:, :2, :2]
+    return np.moveaxis(matrices, 0, -1).reshape((2, 2) + angles.shape)
 
 
 def retr_sperfromcart(xaxi, yaxi, zaxi):
@@ -5029,6 +4952,7 @@ from .numerics import (
     icdf_gaus,
     icdf_logt,
     icdf_self,
+    logpdf_gaus,
     pdfn_atan,
     pdfn_dexp,
     pdfn_dpow,

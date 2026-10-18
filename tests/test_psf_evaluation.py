@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from scipy.integrate import trapezoid
 
 from tdpy import evaluate_psf_profile
 
@@ -9,7 +10,8 @@ from tdpy import evaluate_psf_profile
     ("singking", [0.3, 2.5]),
     ("doubking", [0.3, 2.5, 0.8, 3.0, 0.7]),
 ])
-def test_explicit_psf_parameters_and_spherical_grid_normalization(model, parameters):
+def test_explicit_psf_parameters_and_spherical_grid_normalization(model, parameters, monkeypatch):
+    monkeypatch.delattr(np, 'trapz', raising=False)
     angles = np.linspace(0.0, 1.0, 501)  # [rad]
     psfp = None if parameters is None else np.asarray(parameters, dtype=float)[:, None, None]
 
@@ -21,7 +23,7 @@ def test_explicit_psf_parameters_and_spherical_grid_normalization(model, paramet
 
     assert profile.shape == (1, angles.size, 1)
     assert np.isfinite(profile).all()
-    integral = 2.0 * np.pi * np.trapz(profile[0, :, 0] * np.sin(angles), angles)
+    integral = 2.0 * np.pi * trapezoid(profile[0, :, 0] * np.sin(angles), angles)
     assert integral == pytest.approx(1.0)
 
 

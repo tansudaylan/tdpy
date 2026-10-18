@@ -15,6 +15,10 @@ from tdpy.numerics import (
     icdf_self,
     find_nearest,
     find_nearest_index,
+    grouped_polynomial_design_matrix,
+    gaussian_sigma_from_fwhm,
+    logpdf_gaus,
+    logmeanexp,
     rescale_range,
     robust_scatter,
     range_shift,
@@ -30,6 +34,193 @@ from tdpy.numerics import (
     template_goodness_of_fit,
 )
 from tdpy.util import cdfn_expo, gdatstrtpcat
+
+
+@pytest.mark.parametrize("axis", [None, 0, -1, (0, 2), ()])
+@pytest.mark.parametrize("keepdims", [False, True])
+def test_logmeanexp_preserves_mean_axes_and_shape(axis, keepdims):
+    values = np.arange(24, dtype=float).reshape(2, 3, 4) / 4.0
+    expected = np.log(np.mean(np.exp(values), axis=axis, keepdims=keepdims))
+    actual = logmeanexp(values, axis=axis, keepdims=keepdims)
+    assert np.shape(actual) == np.shape(expected)
+    np.testing.assert_allclose(actual, expected, rtol=1e-14, atol=1e-15)
+
+
+@pytest.mark.parametrize("offset", [-1000.0, 1000.0])
+def test_logmeanexp_preserves_extreme_log_values(offset):
+    actual = logmeanexp([offset, offset - 1.0])
+    expected = offset + np.log((1.0 + np.exp(-1.0)) / 2.0)
+    assert np.isfinite(actual)
+    assert actual == pytest.approx(expected, abs=1e-12)
+
+
+def test_logmeanexp_preserves_scalars_and_nonfinite_limits():
+    assert logmeanexp(4.0) == 4.0
+    assert np.isneginf(logmeanexp([-np.inf, -np.inf]))
+    assert np.isposinf(logmeanexp([0.0, np.inf]))
+    assert np.isnan(logmeanexp([0.0, np.nan]))
+
+
+def test_logmeanexp_rejects_empty_input():
+    with pytest.raises(ValueError, match="empty"):
+        logmeanexp([])
+
+
+@pytest.mark.parametrize("radians", [False, True])
+def test_legacy_rotation_matrix_uses_proper_rotation_and_documented_units(radians):
+    from tdpy.util import retr_matrrota
+
+    angle = np.pi / 4.0 if radians else 45.0
+    matrix = retr_matrrota(angle, boolradn=radians)
+    cosine = np.sqrt(0.5)
+    np.testing.assert_allclose(matrix, [[cosine, -cosine], [cosine, cosine]], atol=1e-15)
+    np.testing.assert_allclose(matrix.T @ matrix, np.eye(2), atol=1e-15)
+    assert np.linalg.det(matrix) == pytest.approx(1.0, abs=1e-15)
+    np.testing.assert_allclose(retr_matrrota(90.0) @ [1.0, 0.0], [0.0, 1.0], atol=1e-15)
+
+
+@pytest.mark.parametrize("shape", [(3,), (2, 3), (0,), (2, 0)])
+def test_legacy_rotation_matrix_preserves_angle_array_layout(shape):
+    from tdpy.util import retr_matrrota
+
+    angles = np.arange(np.prod(shape), dtype=float).reshape(shape) * 0.2  # [rad]
+    original = angles.copy()
+    matrices = retr_matrrota(angles, boolradn=True)
+    assert matrices.shape == (2, 2) + shape
+    expected = np.array([[np.cos(angles), -np.sin(angles)], [np.sin(angles), np.cos(angles)]])
+    np.testing.assert_allclose(matrices, expected, atol=1e-15)
+    np.testing.assert_array_equal(angles, original)
+
+
+def test_legacy_probability_transforms_reexport_only_shared_implementations():
+    import ast
+    from pathlib import Path
+    from tdpy import numerics, util
+
+    path = Path(util.__file__)
+    print(f"Reading from {path}...")
+    definitions = {
+        node.name for node in ast.parse(path.read_text()).body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    for name in ("cdfn_self", "cdfn_logt", "cdfn_gaus", "cdfn_expo", "cdfn_dexp",
+                 "icdf_self", "icdf_gaus", "icdf_expo", "icdf_dexp"):
+        assert name not in definitions, name
+        assert getattr(util, name) is getattr(numerics, name), name
+
+
+def test_grid_quantiles_work_without_removed_numpy_trapz(monkeypatch):
+    from tdpy.numerics import grid_quantiles
+
+    monkeypatch.delattr(np, "trapz", raising=False)
+    grid = np.array([0.0, 1.0, 3.0])
+    density = np.ones(3)
+    np.testing.assert_allclose(grid_quantiles(grid, density, [0.0, 0.5, 1.0]), [0.0, 1.5, 3.0])
+
+
+def test_gaussian_log_density_preserves_normalization_and_broadcasting():
+    values = np.array([-3.0, 0.0, 4.0])[:, None]
+    means = np.array([0.0, 1.0])
+    deviations = np.array([0.5, 2.0])
+    residual = (values - means) / deviations
+    expected = -0.5 * (residual**2 + np.log(2.0 * np.pi * deviations**2))
+    np.testing.assert_allclose(logpdf_gaus(values, means, deviations), expected, rtol=1e-14)
+    assert logpdf_gaus(0.0, 0.0, 1.0) == pytest.approx(-0.5 * np.log(2.0 * np.pi))
+
+
+def test_line_fit_likelihood_preserves_normalization_and_rejections():
+    from types import SimpleNamespace
+    from tdpy.util import retr_llik_corr
+
+    state = SimpleNamespace(
+        tempfrst=np.array([0.0, 1.0, 2.0]), tempseco=np.array([0.2, -0.5, -0.8]),
+        tempfrststdv=np.array([0.1, 0.2, 0.4]), tempsecostdv=np.array([0.3, 0.5, 0.7]),
+    )
+    angle = 1.1  # [rad]
+    intercept = 0.4
+    slope = -1.0 / np.tan(angle)
+    variance = state.tempsecostdv**2 + (slope * state.tempfrststdv)**2
+    model = slope * state.tempfrst + intercept / np.sin(angle)
+    expected = -0.5 * np.sum((state.tempseco - model)**2 / variance + np.log(2.0 * np.pi * variance))
+    assert retr_llik_corr([angle, intercept], state) == pytest.approx(expected, rel=1e-14)
+    assert retr_llik_corr([0.0, intercept], SimpleNamespace()) == -np.inf
+    state.tempfrststdv[:] = 0.0
+    state.tempsecostdv[:] = 0.0
+    assert retr_llik_corr([angle, intercept], state) == -np.inf
+
+
+def test_gaussian_log_density_remains_finite_when_density_underflows():
+    expected = -0.5 * (1000.0**2 + np.log(2.0 * np.pi))
+    actual = logpdf_gaus(1000.0, 0.0, 1.0)
+    assert np.isfinite(actual)
+    assert actual == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("widths", [1.0, [1.0, 2.0, 4.0], np.array([[1.0, 2.0], [3.0, 4.0]])])
+def test_gaussian_width_conversion_preserves_half_maximum_and_shape(widths):
+    sigma = gaussian_sigma_from_fwhm(widths)
+    widths = np.asarray(widths)
+    assert np.shape(sigma) == widths.shape
+    np.testing.assert_allclose(sigma, widths / (2.0 * np.sqrt(2.0 * np.log(2.0))), rtol=1e-15)
+    np.testing.assert_allclose(np.exp(-0.5 * (0.5 * widths / sigma)**2), 0.5, rtol=1e-15)
+
+
+@pytest.mark.parametrize("unit", ["arcsec", "day"])
+def test_gaussian_width_conversion_retains_quantity_units(unit):
+    from astropy import units
+
+    widths = np.array([1.0, 2.0]) * units.Unit(unit)
+    sigma = gaussian_sigma_from_fwhm(widths)
+    assert sigma.unit == widths.unit
+    np.testing.assert_allclose(sigma.value, gaussian_sigma_from_fwhm(widths.value), rtol=1e-15)
+
+
+def test_gaussian_width_conversion_retains_masks_and_nonfinite_values():
+    widths = np.ma.array([1.0, 2.0, np.nan, np.inf], mask=[False, True, False, False])
+    sigma = gaussian_sigma_from_fwhm(widths)
+    np.testing.assert_array_equal(sigma.mask, widths.mask)
+    assert np.isnan(sigma[2]) and np.isposinf(sigma[3])
+    assert sigma[0] == pytest.approx(1.0 / np.sqrt(8.0 * np.log(2.0)))
+
+
+@pytest.mark.parametrize("normalize", [False, True])
+@pytest.mark.parametrize("degree", [0, 1, 2, 3])
+def test_grouped_polynomial_design_matrix_preserves_order_and_support(normalize, degree):
+    coordinates = np.array([4.0, 11.0, 1.0, 16.0, 7.0, 10.0])
+    groups = np.array([9, -2, 9, -2, 9, -2])
+    original_coordinates, original_groups = coordinates.copy(), groups.copy()
+    matrix = grouped_polynomial_design_matrix(coordinates, groups, degree, normalize=normalize)
+    expected = []
+    for group in np.unique(groups):
+        selected = groups == group
+        centered = coordinates[selected] - coordinates[selected].mean()
+        if normalize:
+            centered /= np.ptp(coordinates[selected])
+        for power in range(degree + 1):
+            column = np.zeros(coordinates.size)
+            column[selected] = centered**power
+            expected.append(column)
+    np.testing.assert_array_equal(matrix, np.column_stack(expected))
+    assert matrix.shape == (coordinates.size, 2 * (degree + 1))
+    np.testing.assert_array_equal(coordinates, original_coordinates)
+    np.testing.assert_array_equal(groups, original_groups)
+
+
+def test_grouped_polynomial_normalization_retains_fractional_integer_offsets():
+    matrix = grouped_polynomial_design_matrix([1, 2, 4], [0, 0, 0], degree=2, normalize=True)
+    centered = (np.array([1.0, 2.0, 4.0]) - 7.0 / 3.0) / 3.0
+    np.testing.assert_array_equal(matrix[:, 0], np.ones(3))
+    np.testing.assert_array_equal(matrix[:, 1], centered)
+    np.testing.assert_array_equal(matrix[:, 2], centered**2)
+
+
+@pytest.mark.parametrize("coordinates, groups, degree", [
+    ([], [], 1), ([1.0], [0, 1], 1), ([[1.0]], [[0]], 1),
+    ([1.0], [0], -1), ([1.0], [0], 1.5),
+])
+def test_grouped_polynomial_design_matrix_rejects_invalid_shapes_and_degree(coordinates, groups, degree):
+    with pytest.raises(ValueError):
+        grouped_polynomial_design_matrix(coordinates, groups, degree)
 
 
 @pytest.mark.parametrize("normalization", ["trapezoid", "rectangle"])

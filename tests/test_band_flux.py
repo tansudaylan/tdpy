@@ -1,16 +1,18 @@
 import matplotlib.image as mpimg
 import numpy as np
 import pytest
+from scipy.integrate import trapezoid
 
 from tdpy.spectral import blackbody_spectral_flux, retr_dictfluxband, retr_dictxraystar
 
 
-def test_band_flux_uses_canonical_blackbody_and_reusable_transmission():
+def test_band_flux_uses_canonical_blackbody_and_reusable_transmission(monkeypatch):
+    monkeypatch.delattr(np, 'trapz', raising=False)
     fluxes, state = retr_dictfluxband(6000.0, ['TESS', 'ULTRASAT', 'Bolometric'])
     spectrum = blackbody_spectral_flux(6000.0, xdat=state.midpwlen, typexdat='wlen')
 
     for band in fluxes:
-        assert fluxes[band] == pytest.approx(np.trapz(spectrum * state.dictfunctran[band], x=state.midpwlen))
+        assert fluxes[band] == pytest.approx(trapezoid(spectrum * state.dictfunctran[band], x=state.midpwlen))
     assert fluxes['Bolometric'] > fluxes['TESS'] > 0
     repeated, reused = retr_dictfluxband(6000.0, ['TESS', 'ULTRASAT', 'Bolometric'], gdatfluxband=state)
     assert reused is state

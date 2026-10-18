@@ -3,7 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Callable, Sequence
+
+
+def dispatch_cli(namespace, arguments=None, forward_arguments=True):
+    """Run a named callable from a module namespace using command-line arguments."""
+    arguments = sys.argv[1:] if arguments is None else list(arguments)
+    if not arguments:
+        raise SystemExit('A command name is required.')
+
+    command_name, *command_arguments = arguments
+    command = namespace.get(command_name)
+    if not callable(command) or command_name.startswith('_'):
+        raise SystemExit('Unknown command: %s' % command_name)
+    return command(*(command_arguments if forward_arguments else []))
 
 
 def add_plot_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:

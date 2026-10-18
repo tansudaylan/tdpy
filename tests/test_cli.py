@@ -1,7 +1,7 @@
 import pytest
 import tdpy
 
-from tdpy.cli import add_plot_arguments, parse_plot_arguments, run_plot_cli
+from tdpy.cli import add_plot_arguments, dispatch_cli, parse_plot_arguments, run_plot_cli
 
 
 def test_parse_plot_arguments_defaults_to_png():
@@ -60,6 +60,38 @@ def test_dispatch_cli_can_ignore_trailing_arguments():
     tdpy.dispatch_cli({'run': run}, ['run', 'ignored'], forward_arguments=False)
 
     assert calls == [True]
+
+
+def test_dispatch_cli_aliases_share_one_implementation():
+    from tdpy import util
+
+    assert tdpy.dispatch_cli is dispatch_cli
+    assert util.dispatch_cli is dispatch_cli
+    assert dispatch_cli.__module__ == 'tdpy.cli'
+
+
+def test_dispatch_cli_reads_sys_argv(monkeypatch):
+    import sys
+
+    monkeypatch.setattr(sys, 'argv', ['analysis.py', 'run', 'argument'])
+
+    assert dispatch_cli({'run': lambda value: value}) == 'argument'
+
+
+def test_dispatch_cli_does_not_load_legacy_utilities():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, '-c', (
+            "import sys; import tdpy; "
+            "assert tdpy.dispatch_cli({'run': lambda value: value}, ['run', 'ok']) == 'ok'; "
+            "assert 'tdpy.util' not in sys.modules"
+        )],
+        capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize('arguments', [[], ['missing'], ['_private']])

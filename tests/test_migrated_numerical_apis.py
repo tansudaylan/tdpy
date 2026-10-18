@@ -5,6 +5,27 @@ import tdpy
 from tdpy.exoplanet import quadratic_limb_darkening
 
 
+@pytest.mark.parametrize(
+    ('coefficients', 'label'),
+    (
+        ([3.0], '$y = 3$'),
+        ([2.0, 3.0], '$y = 2 x + 3$'),
+        ([2.0, 3.0, 4.0], '$y = 2 x^2 + 3 x + 4$'),
+    ),
+)
+def test_regr_preserves_polynomial_coefficients_predictions_and_labels(coefficients, label):
+    coordinates = np.linspace(-2.0, 2.0, 11)
+    values = np.polyval(coefficients, coordinates)
+
+    actual_coefficients, polynomial, actual_label = tdpy.regr(
+        coordinates, values, len(coefficients) - 1
+    )
+
+    np.testing.assert_allclose(actual_coefficients, coefficients, atol=1e-13)
+    np.testing.assert_allclose(polynomial(coordinates), values, atol=1e-13)
+    assert actual_label == label
+
+
 def test_canonical_limb_darkening_helpers_preserve_behavior():
     coefficients = np.array((0.4, 0.25))
     cosine_emission_angle = np.linspace(0.0, 1.0, 5)

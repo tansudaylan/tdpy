@@ -14,6 +14,7 @@ if not hasattr(np, 'trapz'):
     np.trapz = np.trapezoid
 
 from .astro import *
+from .cli import dispatch_cli
 from .exoplanet import *
 from .mast import quer_mast, xmat_tici, retr_listtablobsv, retr_rascdeclfromstrgmast, setp_coorstrgmast
 from .numerics import *

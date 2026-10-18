@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import trapezoid
 from scipy.special import ndtr, wofz
 
 
@@ -165,7 +166,7 @@ def integrate_blackbody_flux_wavelength(
     """
     wavelengths = np.linspace(wavelength_min_microns, wavelength_max_microns, number_wavelengths)
     flux = blackbody_flux_wavelength(temperature, wavelengths)
-    integrated = np.trapz(flux, wavelengths, axis=-1 if np.ndim(flux) > 1 else 0)
+    integrated = trapezoid(flux, wavelengths, axis=-1 if np.ndim(flux) > 1 else 0)
     if np.ndim(temperature) == 0:
         return float(integrated)
     return integrated
@@ -460,7 +461,7 @@ def retr_dictfluxband(
                 raise ValueError('Undefined passband %r' % band)
             gdatfluxband.dictfunctran[band] = transmission
     spectrum = blackbody_spectral_flux(tmptstar, xdat=gdatfluxband.midpwlen, typexdat='wlen')
-    fluxes = {band: np.trapz(spectrum * gdatfluxband.dictfunctran[band], x=gdatfluxband.midpwlen)
+    fluxes = {band: trapezoid(spectrum * gdatfluxband.dictfunctran[band], x=gdatfluxband.midpwlen)
               for band in liststrgband}
     if pathvisutarg is not None:
         import matplotlib.pyplot as plt
@@ -504,9 +505,9 @@ def retr_dictxraystar(tmptstar, radistar, diststar):
     transmission = instrument_transmission(typeinst='AXIS', xdat=energy)
     bolometric = bolometric_blackbody_luminosity(tmptstar, radistar)
     fractions = np.where(temperature < 4000.0, 1e-4, 6e-7)
-    surface_flux = np.array([np.trapz(blackbody_flux_energy(value, energy) * transmission, x=energy)
+    surface_flux = np.array([trapezoid(blackbody_flux_energy(value, energy) * transmission, x=energy)
                              for value in temperature])  # [erg s^-1 cm^-2]
-    bolometric_test = np.array([np.trapz(blackbody_flux_energy(value, bolometric_energy), x=bolometric_energy)
+    bolometric_test = np.array([trapezoid(blackbody_flux_energy(value, bolometric_energy), x=bolometric_energy)
                                 for value in temperature])  # [erg s^-1 cm^-2]
     luminosity = 4.0 * np.pi * (6.957e10 * radius)**2 * surface_flux  # [erg s^-1]
     predicted = luminosity + fractions * bolometric[0]  # [erg s^-1]

@@ -1,6 +1,7 @@
 """Point-spread profiles with explicit energy and event-class parameters."""
 
 import numpy as np
+from scipy.integrate import trapezoid
 
 
 def evaluate_psf_profile(
@@ -59,7 +60,7 @@ def evaluate_psf_profile(
     else:
         raise ValueError('Unsupported PSF model %r.' % typemodlpsfn)
     if typenormangl == 'ferm':
-        normalization = 2.0 * np.pi * np.trapz(
+        normalization = 2.0 * np.pi * trapezoid(
             profile * np.sin(angle[None, :, None]), angle, axis=1,
         )[:, None, :]
         profile = profile / normalization
