@@ -38,6 +38,25 @@ def test_run_plot_cli_forwards_output_format():
     assert calls == ["pdf"]
 
 
+def test_run_plot_cli_applies_requested_theme_and_restores_settings(tmp_path):
+    import matplotlib.pyplot as plt
+    from PIL import Image
+
+    original = dict(plt.rcParams)
+
+    def run(typefileplot):
+        figure, axis = plt.subplots()
+        axis.plot([0, 1], [0, 1], color='red')
+        assert axis.xaxis.label.get_color() == 'white'
+        tdpy.save_figure(figure, tmp_path / 'dark', typefileplot, close_figure=True)
+
+    run_plot_cli(run, arguments=['--typeplotback', 'dark'])
+
+    with Image.open(tmp_path / 'dark.png') as image:
+        assert image.convert('RGB').getpixel((0, 0)) == (0, 0, 0)
+    assert dict(plt.rcParams) == original
+
+
 def test_dispatch_cli_forwards_arguments():
     calls = []
 

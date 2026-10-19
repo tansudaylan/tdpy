@@ -27,7 +27,7 @@ The shared tools cover:
 
 ## Profiles and catalog access
 
-Nicomedia's shared helpers now live here. `tdpy.evaluate_psf_profile` evaluates Gaussian, single-King, and double-King profiles from explicit parameters, with optional spherical-angle normalization over the supplied grid. The separate legacy `tdpy.retr_psfn` interface is unchanged. Existing spectral, radial-velocity, limb-darkening, photometric-noise, and population-subsetting functions remain canonical TDpy implementations.
+`tdpy.evaluate_psf_profile` evaluates Gaussian, single-King, and double-King profiles from explicit parameters, with optional spherical-angle normalization over the supplied grid. The separate `tdpy.retr_psfn` interface remains available for existing workflows. TDpy also provides spectral, radial-velocity, limb-darkening, photometric-noise, and population-subsetting functions.
 
 ```bash
 python examples/psf_profiles/double_king_profile.py --typefileplot png
@@ -36,11 +36,11 @@ python examples/psf_profiles/double_king_profile.py --typefileplot png --bokeh
 
 ![Explicit double-King profile and canonical-kernel comparison](examples/psf_profiles/double_king_profile.png)
 
-The example uses dimensionless core and tail widths of 0.8 and 1.7, indices of 2.2 and 3.4, and a core fraction of 0.35. It compares the explicit evaluator with the canonical kernel and reports zero difference for those inputs. The optional HTML version retains the transferred Bokeh interactions.
+The example uses dimensionless core and tail widths of 0.8 and 1.7, indices of 2.2 and 3.4, and a core fraction of 0.35. It compares the explicit evaluator with the canonical kernel and reports zero difference for those inputs.
 
 `tdpy.mast` provides structured MAST requests, TIC column retrieval, TESS observation queries, and target-coordinate resolution. `tdpy.retr_dictfluxband` integrates blackbody surface flux over approximate top-hat passbands, or optional `sncosmo` LSST bandpasses. The historical `Bolometric` option spans only 0.1 to 10 microns. `tdpy.retr_dictxraystar` retains the inherited blackbody-plus-assumed-X-ray-fraction calculation, with assumed excess fractions of $6\times10^{-7}$ or $10^{-4}$ below 4000 K. Those fractions are model assumptions, not measured X-ray luminosities.
 
-Catalog adapters and population synthesis now belong to Pergamon. The original MIT notice is retained in `LICENSE.Nicomedia`.
+Pergamon handles catalog adapters and population synthesis. The original MIT notice is in `LICENSE.Nicomedia`.
 
 ## Installation
 
@@ -78,7 +78,7 @@ Compare the plain image with the annotated view to inspect the supplied position
 
 ## Core plotting utilities
 
-`tdpy.plot_catl()` overlays source positions, magnitudes, and annotations on image fields. Corner plots of parameter samples are drawn by PCAT; posterior sampling, including `pcat.fixed.sample_posterior`, lives in PCAT.
+`tdpy.plot_catl()` overlays source positions, magnitudes, and annotations on image fields. PCAT draws corner plots of parameter samples and provides posterior sampling, including `pcat.fixed.sample_posterior`.
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations.
 
@@ -132,11 +132,11 @@ python examples/tess_visibility/tess_visibility.py --sectors 1 2 3 4
 
 ![TOI alert dates accumulating across TESS sectors, with TOI-1233 highlighted](examples/tess_visibility/visuals/tess_sector_sequence_tois.gif)
 
-The inputs are integer sector numbers and optional named International Celestial Reference System coordinates in degrees. The example highlights the real position of TOI-1233 and also marks Beta Pictoris and the Large Magellanic Cloud. Dates for Sectors 1--121 come from the `tesswcs` pointing table; the provisional dates and pointings for Sectors 122--134 come from [NASA's TESS observing schedule](https://heasarc.gsfc.nasa.gov/docs/tess/sector.html), recorded on October 1, 2026. `tesswcs` predicts camera geometry for future sectors from those published pointings. Frames distinguish past, in-progress, and planned sectors as of the rendering date. These markers illustrate sky coverage and do not represent new observations. Each target is transformed through all 16 sector CCD World Coordinate Systems and is visible only when its pixel coordinate falls on silicon.
+The inputs are integer sector numbers and optional named International Celestial Reference System coordinates in degrees. The example highlights the real position of TOI-1233 and also marks Beta Pictoris and the Large Magellanic Cloud. Dates for Sectors 1--121 come from the `tesswcs` pointing table. Provisional dates and pointings for Sectors 122--134 come from [NASA's TESS observing schedule](https://heasarc.gsfc.nasa.gov/docs/tess/sector.html), recorded on October 1, 2026. `tesswcs` predicts camera geometry for future sectors from those published pointings. Frames distinguish past, in-progress, and planned sectors as of the rendering date. These markers illustrate sky coverage and do not represent new observations. Each target is transformed through all 16 sector CCD World Coordinate Systems and is visible only when its pixel coordinate falls on silicon.
 
-The second animation shows the 8,148 TOI candidates in the [ExoFOP TESS TOI table](https://exofop.ipac.caltech.edu/tess/view_toi.php), using its **Date TOI Alerted (UTC)** and sky-position columns as downloaded on October 1, 2026. Each candidate first appears in the sector frame whose end date reaches its alert date; multiple candidates around one star overlap at the same sky position. TOI-1233 receives a separate red marker beginning with its 2019-08-26 alert. Future frames retain the TOIs already alerted as of the render date and do not imply future discoveries. The compact [TOI snapshot](examples/tess_visibility/toi_alerts.csv) makes offline reruns reproducible; `--refresh-tois` explicitly downloads an updated ExoFOP table.
+The second animation shows the 8,148 TOI candidates in the [ExoFOP TESS TOI table](https://exofop.ipac.caltech.edu/tess/view_toi.php), using its **Date TOI Alerted (UTC)** and sky-position columns as downloaded on October 1, 2026. Each candidate first appears in the sector frame whose end date reaches its alert date. Multiple candidates around one star overlap at the same sky position. TOI-1233 receives a separate red marker beginning with its 2019-08-26 alert. Future frames retain the TOIs already alerted as of the render date and do not imply future discoveries. The compact [TOI snapshot](examples/tess_visibility/toi_alerts.csv) makes offline reruns reproducible. Use `--refresh-tois` to download an updated ExoFOP table.
 
-Static figures are written directly under `examples/tess_visibility/visuals/`. The example also writes one map per requested static-map sector. Runtime and memory scale with the number of animated sectors; use `--animation-sectors 1 2 3 4` for a short development run. The footprint boundary follows nominal detector geometry in `tesswcs`; future pointings remain provisional, and the maps do not model scattered light, data-quality masks, cadence availability, or target-specific postage-stamp allocation.
+Static figures are written directly under `examples/tess_visibility/visuals/`. The example also writes one map per requested static-map sector. Runtime and memory scale with the number of animated sectors. Use `--animation-sectors 1 2 3 4` for a short development run. The footprint boundary follows nominal detector geometry in `tesswcs`. Future pointings remain provisional, and the maps do not model scattered light, data-quality masks, cadence availability, or target-specific postage-stamp allocation.
 
 ## Exoplanet discoveries and target systems
 

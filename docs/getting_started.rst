@@ -23,8 +23,8 @@ The target-visibility workflow uses a named observatory and target:
 
    python examples/target_visibility/run.py --target TOI-1233 --observatory TUG
 
-It computes one-night altitude curves and annual target visibility. The inputs
-are coordinates and observatory metadata; no observation data are downloaded.
+It computes one-night altitude curves and annual target visibility from
+coordinates and observatory metadata. No observation data are downloaded.
 
 Module layout
 -------------

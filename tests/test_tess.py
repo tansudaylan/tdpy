@@ -111,11 +111,11 @@ def test_animation_dates_and_highlights_planned_target(tmp_path, monkeypatch):
     text_labels = []
     render_frame = tess_module.figure_to_frame
 
-    def capture_frame(figure):
+    def capture_frame(figure, **kwargs):
         axis = figure.axes[0]
         titles.append(axis.get_title())
         text_labels.append([(item.get_text(), item.get_fontweight()) for item in axis.texts])
-        return render_frame(figure)
+        return render_frame(figure, **kwargs)
 
     monkeypatch.setattr(tess_module, 'figure_to_frame', capture_frame)
     path = animate_tess_sectors(
@@ -137,10 +137,10 @@ def test_toi_dots_start_at_alert_date_and_highlight_toi1233(tmp_path, monkeypatc
     frames = []
     render_frame = tess_module.figure_to_frame
 
-    def capture_frame(figure):
+    def capture_frame(figure, **kwargs):
         axis = figure.axes[0]
         frames.append((axis.get_title(), [item.get_text() for item in axis.texts]))
-        return render_frame(figure)
+        return render_frame(figure, **kwargs)
 
     monkeypatch.setattr(tess_module, 'figure_to_frame', capture_frame)
     alerts = (

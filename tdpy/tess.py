@@ -417,8 +417,8 @@ def animate_tess_sectors(
             status = 'Past'
         axis.set_title(f'TESS Sector {sector} | {start} to {end} ({status})')
         figure.tight_layout()
-        frames.append(figure_to_frame(figure))
-    return write_animation(frames, output_path, duration_ms=duration_ms)
+        frames.append(figure_to_frame(figure, typeplotback=typeplotback))
+    return write_animation(frames, output_path, duration_ms=duration_ms, typeplotback=typeplotback)
 
 
 TESS_MAGNITUDE_ZEROPOINT_ELECTRONS_PER_SECOND = 20.4

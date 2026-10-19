@@ -36,11 +36,15 @@ import astropy.units as u
 
 from .cli import dispatch_cli
 from .plotting import (
+    configure_plot_style,
     normalize_plot_background,
     plot_background_colors,
     plot_file_path,
+    plot_style,
     save_current_figure,
     save_figure,
+    save_plot,
+    themed_plot,
 )
 from .paths import RepositoryPaths, get_data_path
 from .serialization import write_fits
@@ -347,6 +351,7 @@ def fit_fourier_series(values, sample_locations, period, harmonic_count):
     return coefficients, design_matrix @ coefficients
 
 
+@themed_plot
 def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=None, nx=None, ny=None):
     """Plot LSST deep-drilling fields over TESS footprints.
 
@@ -374,6 +379,7 @@ def plot_lsst_ddf_tess_footprint(tess_sectors, output_dir, fields=None, nx=None,
         sectors,
         Path(output_dir) / filename,
         targets=targets,
+        typeplotback=plot_background_colors()[0],
     )
     return {name: list(covered) for name, covered in visibility.items()}, str(output_path)
 
@@ -672,6 +678,7 @@ def retr_kdeg(listsamp, varb, stdv):
     return kdeg
 
 
+@themed_plot
 def plot_recaprec( \
                   # base path for placing the plots
                   pathvisu, \
@@ -1226,7 +1233,7 @@ def plot_recaprec( \
                 axis.set_ylabel(lablyaxi)
                 path = pathvisu + '%s_%s_%s%s.%s' % (nametypeperf, nameclassamp, namepara, strgextn, typefileplot) 
                 print('Writing to %s...' % path)
-                plt.savefig(path)
+                save_plot(plt.gcf(), path)
                 plt.close()
 
                 for l, nameparaseco in enumerate(dictlistnamepara[nameclassamp]):
@@ -1246,7 +1253,7 @@ def plot_recaprec( \
                         axis.set_yscale('log')
                     path = pathvisu + '%s_%s_%s%s.%s' % (nametypeperf, namepara, nameparaseco, strgextn, typefileplot) 
                     print('Writing to %s...' % path)
-                    plt.savefig(path)
+                    save_plot(plt.gcf(), path)
                     plt.close()
     
 
@@ -1532,12 +1539,7 @@ def sign_code(axis, typesigncode, typeplotback='white'):
     Sign the axis to indicate the generating code.
     ''' 
     
-    if typeplotback == 'white':
-        edgecolor = 'black'
-        facecolor = typeplotback
-    elif typeplotback == 'black':
-        edgecolor = 'white'
-        facecolor = typeplotback
+    facecolor, edgecolor = plot_background_colors(typeplotback)
 
     bbox = dict(boxstyle='round', edgecolor=edgecolor, facecolor=facecolor)
     axis.text(0.97, 0.05, 'github.com/tansudaylan/%s' % typesigncode, bbox=bbox, \
@@ -2849,6 +2851,7 @@ def retr_indximagmaxm(data):
     return indxxdatmaxm, indxydatmaxm
 
 
+@plot_style()
 def plot_timeline(
                   dictrows, \
                   
@@ -2886,7 +2889,7 @@ def plot_timeline(
                   dictcolrlabl=None, \
                   
                   # type of plot background
-                  typeplotback='white', \
+                  typeplotback=None, \
 
                   ## file type of the plot
                   typefileplot='png', \
@@ -2894,6 +2897,8 @@ def plot_timeline(
     '''
     Make a timeline (Gantt) chart
     '''
+    if typeplotback is not None:
+        configure_plot_style(typeplotback)
     
     if sizefigr is None:
         sizefigr = (8., 4.)
@@ -3094,12 +3099,8 @@ def plot_timeline(
     
     booluzip = False
 
-    if typeplotback == 'white':
-        edgecolor = 'black'
-        textcolor = 'black'
-    elif typeplotback == 'black':
-        edgecolor = 'white'
-        textcolor = 'white'
+    _, edgecolor = plot_background_colors(typeplotback)
+    textcolor = edgecolor
 
     deltjdat = maxmjdat - minmjdat
     listjdatbins = np.arange(minmjdat, maxmjdat+1, 2. * 365.)
@@ -3231,10 +3232,11 @@ def plot_timeline(
         
         print('Writing to %s...' % path)
         plt.tight_layout()
-        plt.savefig(path, dpi=300)
+        save_plot(plt.gcf(), path, dpi=300)
         plt.close()
 
 
+@themed_plot
 def plot_gene(path, xdat, ydat, yerr=None, scalxdat=None, scalydat=None, \
                                             lablxdat='', lablydat='', plottype=None, limtxdat=None, limtydat=None, colr=None, listlinestyl=None, \
                                             alph=None, listlegd=None, listvlinfrst=None, listvlinseco=None, listhlin=None, drawdiag=False):
@@ -3303,7 +3305,7 @@ def plot_gene(path, xdat, ydat, yerr=None, scalxdat=None, scalydat=None, \
         limtydat = [np.amin(np.concatenate(listydat)), np.amax(np.concatenate(listydat))]
     
     if drawdiag:
-        axis.plot(limtxdat, limtxdat, ls='--', alpha=0.3, color='black')
+        axis.plot(limtxdat, limtxdat, ls='--', alpha=0.3, color=plot_background_colors()[1])
     
     axis.set_xlim(limtxdat)
     axis.set_ylim(limtydat)
@@ -3330,7 +3332,7 @@ def plot_gene(path, xdat, ydat, yerr=None, scalxdat=None, scalydat=None, \
     axis.set_ylabel(lablydat)
 
     figr.tight_layout()
-    figr.savefig(path)
+    save_plot(figr, path)
     plt.close(figr)
 
 
@@ -3460,6 +3462,7 @@ def retr_aang(xpos, ypos):
     return np.mod(np.arctan2(ypos, xpos), 2.0 * np.pi)
 
 
+@themed_plot
 def read_fits(path, pathvisu=None, typeverb=1):
     '''
     Read FITS file
@@ -3556,7 +3559,7 @@ def read_fits(path, pathvisu=None, typeverb=1):
                     plt.tight_layout()
                     path = pathvisu + 'hist_%s.%s' % (listtype[n], typefileplot)
                     cmnd += ' ' + path
-                    figr.savefig(path)
+                    save_plot(figr, path)
                     plt.close(figr)
 
         print('')
@@ -3569,6 +3572,7 @@ def read_fits(path, pathvisu=None, typeverb=1):
     return listhdun, dictpopl
 
 
+@themed_plot
 def plot_maps(path, maps, pixltype='heal', scat=None, indxpixlrofi=None, numbpixl=None, titl='', minmlgal=None, maxmlgal=None, minmbgal=None, maxmbgal=None, \
                                                                                         resi=False, satu=False, numbsidelgal=None, numbsidebgal=None, igal=False):
    
@@ -3643,7 +3647,7 @@ def plot_maps(path, maps, pixltype='heal', scat=None, indxpixlrofi=None, numbpix
     
     plt.title(titl, y=1.08)
 
-    figr.savefig(path)
+    save_plot(figr, path)
     plt.close(figr)
     
 
@@ -3801,6 +3805,7 @@ def retr_sbrtfdfm(binsener, numbside=256, vfdm=7):
     return sbrtfdfm
 
 
+@themed_plot
 def plot_matr(axis, xdat, ydat, labl, loc=1):
     
     listlinestyl = [':', '--', '-']
@@ -3821,6 +3826,7 @@ def plot_matr(axis, xdat, ydat, labl, loc=1):
     axis.legend(line, labl, loc=loc, ncol=2, framealpha=1.)
 
 
+@themed_plot
 def plot_braz(axis, xdat, ydat, yerr=None, numbsampdraw=0, lcol='yellow', dcol='green', mcol='black', labl=None, alpha=None):
     
     if numbsampdraw > 0:
@@ -4070,6 +4076,7 @@ def retr_doubking(scaldevi, frac, sigc, gamc, sigt, gamt):
     return psfn
 
 
+@themed_plot
 def plot_catl(gdat, axis, indxsideyposoffs=0, indxsidexposoffs=0, annotation_alpha=0.3, label_offset=0.5):
 
     try:
@@ -4349,6 +4356,7 @@ def retr_beam(meanener, evtt, numbside, maxmmpol, recotype, fulloutp=False, eval
         return tranfunc
 
 
+@themed_plot
 def plot_fermsmth():
 
     numbside = 256
@@ -4374,7 +4382,7 @@ def plot_fermsmth():
         plt.loglog(mpol, np.sqrt((2. * mpol + 1.) / 4. / np.pi), label='Analytic')
         path = pathvisualsferm + 'almcinpt.%s' % typefileplot
         plt.legend(framealpha=1.)
-        figr.savefig(path)
+        save_plot(figr, path)
         plt.close(figr)
         
         figr, axis = plt.subplots()
@@ -4383,7 +4391,7 @@ def plot_fermsmth():
                 plt.loglog(mpol, almcoutp[i, :, m], label='$E=%.3g$, PSF%d' % (meanenerplot[i], indxevtt[m]))
         plt.legend(loc=3, framealpha=1.)
         path = pathvisualsferm + 'almcoutp.%s' % typefileplot
-        figr.savefig(path)
+        save_plot(figr, path)
         plt.close(figr)
             
         figr, axis = plt.subplots()
@@ -4392,7 +4400,7 @@ def plot_fermsmth():
                 plt.loglog(mpol, tranfunc[i, :, m], label='$E=%.3g$, PSF%d' % (meanenerplot[i], indxevtt[m]))
         plt.legend(loc=3, framealpha=1.)
         path = pathvisualsferm + 'tranfunc.%s' % typefileplot
-        figr.savefig(path)
+        save_plot(figr, path)
         plt.close(figr)
         
         maxmgang = 20.
@@ -4474,6 +4482,7 @@ def retr_timeunitdays(time):
 
 
 
+@themed_plot
 def plot_plot(path, xdat, ydat, lablxdat, lablydat, scalxaxi, titl=None, linestyl=[None], colr=[None], legd=[None], **args):
     
     if not isinstance(ydat, list):
@@ -4487,7 +4496,7 @@ def plot_plot(path, xdat, ydat, lablxdat, lablydat, scalxaxi, titl=None, linesty
             linestyl = '-'
         else:
             linestyl = '--'
-        axis.plot(xdat, ydat, ls=linestyl, color='black', **args)
+        axis.plot(xdat, ydat, ls=linestyl, color=plot_background_colors()[1], **args)
         # temp
         #axis.plot(xdat, ydat, ls=linestyl[k], color=colr[k], label=legd[k], **args)
     axis.set_ylabel(lablydat)
@@ -4497,10 +4506,11 @@ def plot_plot(path, xdat, ydat, lablxdat, lablydat, scalxaxi, titl=None, linesty
     if titl is not None:
         axis.set_title(titl)
     plt.tight_layout()
-    figr.savefig(path)
+    save_plot(figr, path)
     plt.close(figr)
 
 
+@themed_plot
 def plot_hist( \
               path, \
               listpara, \
@@ -4546,7 +4556,7 @@ def plot_hist( \
     if titl is not None:
         axis.set_title(titl)
     plt.tight_layout()
-    figr.savefig(path + '_hist.%s' % typefileplot)
+    save_plot(figr, path + '_hist.%s' % typefileplot)
     plt.close(figr)
 
 

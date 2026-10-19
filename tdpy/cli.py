@@ -45,6 +45,13 @@ def run_plot_cli(
     arguments: Sequence[str] | None = None,
 ) -> int:
     """Run a plot example with the shared command-line output-format option."""
-    options = parse_plot_arguments(description=description, arguments=arguments)
-    runner(options.typefileplot)
+    from .plotting import plot_style
+
+    parser = add_plot_arguments(argparse.ArgumentParser(description=description))
+    parser.add_argument(
+        "--typeplotback", choices=("white", "dark", "norm", "black"), default="white"
+    )
+    options = parser.parse_args(arguments)
+    with plot_style(options.typeplotback):
+        runner(options.typefileplot)
     return 0

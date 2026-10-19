@@ -20,7 +20,7 @@ Exoplanet utilities
    :members:
 
 Point-spread profiles and spectra
---------------------------------
+---------------------------------
 
 .. automodule:: tdpy.psf
    :members: evaluate_psf_profile
