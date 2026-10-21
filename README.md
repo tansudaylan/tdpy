@@ -58,7 +58,7 @@ Install `python -m pip install -e '.[bokeh]'` to enable `tdpy.plotting.save_boke
 
 ## Console output
 
-tdpy and the pipelines built on it (PCAT, miletos, ephesos, and the others in this ecosystem) print nothing by default, including progress bars and their own numerical warnings. Set `export TDPY_VERBOSITY=1` to restore progress messages, file narration, and warnings.
+TDpy and pipelines built on it, including PCAT, Miletos, and Ephesos, print nothing by default, including progress bars and numerical warnings. Set `export TDPY_VERBOSITY=1` to enable progress messages, file narration, and warnings.
 
 ## Quick example
 
@@ -82,18 +82,14 @@ Compare the plain image with the annotated view to inspect the supplied position
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations.
 
-## Sampling boundary
+## Posterior sampling
 
-TDpy provides numerical transforms and independent random variate generators such as `samp_gaustrun`, `samp_powr`, and `samp_dpow`. These functions draw directly from specified distributions and do not run Markov chain Monte Carlo (MCMC).
+TDpy provides numerical transforms and independent random variate generators such as `samp_gaustrun`, `samp_powr`, and `samp_dpow`. These functions draw directly from specified distributions and do not run Markov chain Monte Carlo (MCMC). PCAT provides posterior-sampling interfaces for fixed-dimensional inference and transdimensional catalog models.
 
-PCAT is the sole posterior sampler in this software ecosystem. Use:
-
-- `pcat.sampling.sample()` for transdimensional catalog inference;
-- `pcat.sampling.sample_fixed()` for a fixed-dimensional model;
-- `pcat.sampling.sample_fixed_chains()` for multiple fixed-dimensional chains; and
-- `pcat.sampling.sample_posterior()` for the dictionary-style interface formerly provided by TDpy.
-
-TDpy does not expose `tdpy.mcmc`, `tdpy.samp`, or posterior-sampling compatibility wrappers. This keeps the dependency direction one-way because PCAT depends on TDpy for numerical utilities.
+- `pcat.sampling.sample()` for transdimensional catalog inference
+- `pcat.sampling.sample_fixed()` for a fixed-dimensional model
+- `pcat.sampling.sample_fixed_chains()` for multiple fixed-dimensional chains
+- `pcat.sampling.sample_posterior()` for the dictionary-style interface
 
 ## Nightly and annual target visibility
 
