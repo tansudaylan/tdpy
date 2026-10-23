@@ -193,6 +193,23 @@ def test_exoplanet_discovery_plots_highlight_selected_systems(tmp_path):
     assert period_radius_path.is_file() and period_radius_path.stat().st_size > 1000
 
 
+def test_toi1233_highlight_uses_its_archive_host_name():
+    from pathlib import Path
+    from runpy import run_path
+
+    example_path = Path(__file__).parents[1] / "examples" / "exoplanet_discoveries" / "run.py"
+    example = run_path(str(example_path), run_name="tdpy_discovery_example")
+    targets = example["HIGHLIGHTED_TARGETS"]
+    planets = example["load_planets"]()
+
+    assert targets["HD 108236"] == "TOI-1233 / HD 108236"
+    assert "HD 108147" not in targets
+    assert any(
+        planet["pl_name"] == "TOI-1233.01" and planet["hostname"] == "HD 108236"
+        for planet in planets
+    )
+
+
 def test_kepler_third_law_round_trip():
     period = 10.0  # [day]
     mass = 1.0  # [M_sun]

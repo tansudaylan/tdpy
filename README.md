@@ -136,7 +136,7 @@ Static figures are written directly under `examples/tess_visibility/visuals/`. T
 
 ## Exoplanet discoveries and target systems
 
-The [`exoplanet_discoveries` example](examples/exoplanet_discoveries/run.py) plots confirmed planets from [NASA's Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/), downloaded on October 11, 2026, and bundles the queried rows for offline reruns. TOI-1233 is listed in the archive under its host-star name, HD 108147. It is highlighted alongside WASP-39, WASP-121, TRAPPIST-1, TOI-270, and TOI-700 in a discovery timeline and a period-radius comparison. The timeline separates discoveries by method and marks each selected system's first listed discovery year.
+The [`exoplanet_discoveries` example](examples/exoplanet_discoveries/run.py) plots confirmed planets from [NASA's Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/), downloaded on October 11, 2026, and bundles the queried rows for offline reruns. TOI-1233 is listed in the archive under its host-star name, HD 108236. It is highlighted alongside WASP-39, WASP-121, TRAPPIST-1, TOI-270, and TOI-700 in a discovery timeline and a period-radius comparison. The timeline separates discoveries by method and marks each selected system's first listed discovery year.
 
 Run the example from the TDpy repository root with:
 

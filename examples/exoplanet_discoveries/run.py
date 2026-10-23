@@ -24,7 +24,7 @@ ARCHIVE_QUERY = (
 )
 DATA_COLUMNS = ("pl_name", "hostname", "discoverymethod", "disc_year", "pl_orbper", "pl_rade")
 HIGHLIGHTED_TARGETS = {
-    "HD 108147": "TOI-1233 / HD 108147",
+    "HD 108236": "TOI-1233 / HD 108236",
     "WASP-39": "WASP-39",
     "WASP-121": "WASP-121",
     "TRAPPIST-1": "TRAPPIST-1",
