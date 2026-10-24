@@ -25,6 +25,17 @@ The shared tools cover:
 - evaluate normalized line profiles, power-law/curved/cutoff continua, blackbody flux and luminosity, and AXIS transmission with `tdpy.spectral`
 - run labeled, fail-fast command sequences with `tdpy.workflow`.
 
+`tdpy.exoplanet.energy_limited_mass_loss` divides absorbed XUV power by the
+planet's binding energy per unit mass and returns an Astropy mass-loss-rate
+quantity. Supply mass, radius, and incident XUV flux with physical units.
+Heating efficiency, absorption radius, and the dimensionless Roche factor
+are explicit assumptions. The absorption radius defaults to the planet radius
+and the Roche factor to unity. Arrays broadcast, while masked observations
+and nonphysical inputs are rejected. This static energy budget does not evolve
+an atmosphere, calculate radiative cooling, or predict a population radius valley.
+The energy-limited approximation and Roche correction are discussed by Erkaev
+et al. (2007), *A&A*, 472, 329, DOI `10.1051/0004-6361:20066929`.
+
 ## Profiles and catalog access
 
 `tdpy.evaluate_psf_profile` evaluates Gaussian, single-King, and double-King profiles from explicit parameters, with optional spherical-angle normalization over the supplied grid. The separate `tdpy.retr_psfn` interface remains available for existing workflows. TDpy also provides spectral, radial-velocity, limb-darkening, photometric-noise, and population-subsetting functions.

@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from tdpy.exoplanet import (
+    energy_limited_mass_loss,
     empirical_interval_contrasts,
     fold_tser,
     keplerian_radial_velocity,
@@ -47,6 +48,61 @@ from tdpy.exoplanet import (
     retr_vesc,
     stellar_limb_darkened_brightness,
 )
+
+
+def test_energy_limited_escape_matches_absorbed_power_and_unit_conversions():
+    from astropy import units as u
+    from astropy.constants import G
+
+    mass = 5 * u.M_earth  # [Earth mass]
+    radius = 2 * u.R_earth  # [Earth radius]
+    flux = 100 * u.W / u.m**2  # [W/m^2]
+    rate = energy_limited_mass_loss(mass, radius, flux, efficiency=0.15)
+    expected = (0.15 * np.pi * radius**2 * flux / (G * mass / radius)).to(u.kg / u.s)
+    assert rate.to_value(u.kg / u.s) == pytest.approx(expected.value)
+    assert energy_limited_mass_loss(mass.to(u.g), radius.to(u.cm), flux.to(u.erg / u.s / u.cm**2),
+                                    efficiency=0.15).to_value(u.kg / u.s) == pytest.approx(rate.value)
+
+
+def test_energy_limited_escape_scalings_broadcast_and_zero_power():
+    from astropy import units as u
+
+    baseline = energy_limited_mass_loss(5 * u.M_earth, 2 * u.R_earth, 100 * u.W / u.m**2)
+    rates = energy_limited_mass_loss(5 * u.M_earth, np.array([2, 4])[:, None] * u.R_earth,
+                                     np.array([0, 100, 200]) * u.W / u.m**2)
+    assert rates.shape == (2, 3)
+    np.testing.assert_allclose((rates / baseline).value, [[0, 1, 2], [0, 8, 16]])
+    assert energy_limited_mass_loss(10 * u.M_earth, 2 * u.R_earth, 100 * u.W / u.m**2).value == pytest.approx(baseline.value / 2)
+    assert energy_limited_mass_loss(5 * u.M_earth, 2 * u.R_earth, 100 * u.W / u.m**2,
+                                    absorption_radius=4 * u.R_earth, roche_factor=0.5).value == pytest.approx(8 * baseline.value)
+    assert energy_limited_mass_loss(5 * u.M_earth, 2 * u.R_earth, 100 * u.W / u.m**2, efficiency=0).value == 0
+
+
+@pytest.mark.parametrize('parameter,value', [
+    ('planet_mass', 0), ('planet_radius', -1), ('xuv_flux', -1),
+    ('efficiency', -0.1), ('efficiency', 1.1), ('roche_factor', 0),
+    ('roche_factor', 1.1), ('absorption_radius', 1), ('efficiency', np.nan),
+])
+def test_energy_limited_escape_rejects_nonphysical_inputs(parameter, value):
+    from astropy import units as u
+
+    kwargs = {'planet_mass': 5 * u.M_earth, 'planet_radius': 2 * u.R_earth,
+              'xuv_flux': 100 * u.W / u.m**2}
+    unit = {'planet_mass': u.M_earth, 'planet_radius': u.R_earth,
+            'xuv_flux': u.W / u.m**2, 'absorption_radius': u.R_earth}.get(parameter, u.one)
+    kwargs[parameter] = value * unit
+    with pytest.raises(ValueError):
+        energy_limited_mass_loss(**kwargs)
+
+
+def test_energy_limited_escape_requires_units_and_preserves_missingness():
+    from astropy import units as u
+
+    with pytest.raises(u.UnitConversionError):
+        energy_limited_mass_loss(5, 2 * u.R_earth, 100 * u.W / u.m**2)
+    with pytest.raises(ValueError, match='unmasked'):
+        energy_limited_mass_loss(5 * u.M_earth, 2 * u.R_earth, 100 * u.W / u.m**2,
+                                 efficiency=np.ma.array([0.1, 0.2], mask=[False, True]))
 
 
 def test_kepler_equation_preserves_cycles_and_broadcasts():

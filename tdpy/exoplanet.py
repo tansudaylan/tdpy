@@ -854,6 +854,47 @@ def retr_vesc(
 planetary_escape_velocity = retr_vesc
 
 
+def energy_limited_mass_loss(planet_mass, planet_radius, xuv_flux, efficiency=0.1,
+                             absorption_radius=None, roche_factor=1.0):
+    """Return a static energy-limited escape rate as an Astropy mass/time quantity.
+
+    Physical inputs require units. The calculation is
+    eta * pi * R_abs**2 * F_XUV / (G * M_p / R_p * K).
+    R_abs defaults to R_p, and the dimensionless Roche factor K defaults to
+    unity. The caller supplies K, rather than inferring a Roche geometry here.
+    Inputs broadcast. Masked observations, nonfinite or nonphysical inputs,
+    efficiencies outside [0, 1], K outside (0, 1], and R_abs < R_p are rejected.
+    This energy budget does not model radiative cooling, hydrodynamic escape,
+    atmospheric supply, evolving irradiation, or changing planet structure.
+    """
+    from astropy import units
+    from astropy.constants import G
+
+    def converted(value, unit):
+        if np.ma.is_masked(value) or np.any(getattr(value, 'mask', False)):
+            raise ValueError('Escape inputs must be unmasked')
+        array = np.asarray(units.Quantity(value).to_value(unit))
+        if array.dtype.kind not in 'iuf' or not np.isfinite(array).all():
+            raise ValueError('Escape inputs must be finite real values')
+        return array.astype(float)
+
+    if absorption_radius is None:
+        absorption_radius = planet_radius
+    mass, radius, flux, eta, radius_abs, factor = np.broadcast_arrays(
+        converted(planet_mass, units.kg), converted(planet_radius, units.m),
+        converted(xuv_flux, units.W / units.m**2),
+        converted(efficiency, units.dimensionless_unscaled),
+        converted(absorption_radius, units.m), converted(roche_factor, units.dimensionless_unscaled),
+    )
+    if (np.any(mass <= 0) or np.any(radius <= 0) or np.any(flux < 0)
+            or np.any((eta < 0) | (eta > 1)) or np.any((factor <= 0) | (factor > 1))
+            or np.any(radius_abs < radius)):
+        raise ValueError('Require positive mass and radius, nonnegative flux, physical efficiency and Roche factor, and R_abs >= R_p')
+    with np.errstate(over='raise', divide='raise', invalid='raise'):
+        rate = eta * np.pi * radius_abs**2 * flux * radius / (G.to_value(units.m**3 / units.kg / units.s**2) * mass * factor)
+    return rate * units.kg / units.s
+
+
 def keplerian_orbital_speed(
     stellar_mass_solar: float | np.ndarray,
     semimajor_axis_au: float | np.ndarray,
