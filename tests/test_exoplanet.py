@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from matplotlib import pyplot as plt
 
 from tdpy.exoplanet import (
     energy_limited_mass_loss,
@@ -221,7 +222,7 @@ def test_exoplanet_forecast_plots_write_requested_files(tmp_path):
     assert contrast_path.is_file()
 
 
-def test_exoplanet_discovery_plots_highlight_selected_systems(tmp_path):
+def test_exoplanet_discovery_plots_highlight_selected_systems(tmp_path, monkeypatch):
     planets = [
         {"pl_name": "HD 108147 b", "hostname": "HD 108147", "discoverymethod": "Radial Velocity",
          "disc_year": "2002", "pl_orbper": "10.9", "pl_rade": "10.9"},
@@ -238,6 +239,15 @@ def test_exoplanet_discovery_plots_highlight_selected_systems(tmp_path):
         "TRAPPIST-1": "TRAPPIST-1",
     }
 
+    captured_axes = []
+    original_subplots = plt.subplots
+
+    def capture_subplots(*args, **kwargs):
+        figure, axis = original_subplots(*args, **kwargs)
+        captured_axes.append(axis)
+        return figure, axis
+
+    monkeypatch.setattr(plt, "subplots", capture_subplots)
     timeline_path = plot_exoplanet_discovery_timeline(
         planets, targets, tmp_path / "discovery_timeline.png"
     )
@@ -247,6 +257,12 @@ def test_exoplanet_discovery_plots_highlight_selected_systems(tmp_path):
 
     assert timeline_path.is_file() and timeline_path.stat().st_size > 1000
     assert period_radius_path.is_file() and period_radius_path.stat().st_size > 1000
+    assert len(captured_axes) == 2
+    assert all(
+        not gridline.get_visible()
+        for axis in captured_axes
+        for gridline in axis.get_xgridlines() + axis.get_ygridlines()
+    )
 
 
 def test_toi1233_highlight_uses_its_archive_host_name():

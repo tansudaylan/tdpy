@@ -13,18 +13,31 @@ PATH_ENV_VAR = "TDPY_PATH"
 
 @dataclass(frozen=True)
 class RepositoryPaths:
-    """Resolve one repository's runtime directories from its environment variable."""
+    """Resolve repository paths from an environment variable and optional default.
+
+    A supplied default populates an unset variable and repairs a blank value on
+    first access. Without a default, the environment variable is required.
+    """
 
     environment_variable: str
+    default_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.default_path is not None:
+            os.environ.setdefault(self.environment_variable, str(self.default_path))
 
     def get_repository_path(self) -> Path:
         """Return the configured repository path."""
 
         path_value = os.environ.get(self.environment_variable)
         if not path_value or not path_value.strip():
-            raise EnvironmentError(
-                f"{self.environment_variable} is required and cannot be empty."
-            )
+            if self.default_path is not None:
+                path_value = str(self.default_path)
+                os.environ[self.environment_variable] = path_value
+            else:
+                raise EnvironmentError(
+                    f"{self.environment_variable} is required and cannot be empty."
+                )
         return Path(path_value).expanduser().resolve()
 
     def get_data_path(self) -> Path:

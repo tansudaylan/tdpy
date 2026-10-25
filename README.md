@@ -119,10 +119,10 @@ Install `python -m pip install -e '.[bokeh]'` and add `--bokeh` to write the int
 
 `tdpy.tess` converts the Transiting Exoplanet Survey Satellite (TESS) mission pointing and detector World Coordinate Systems from `tesswcs` into reusable sky products. It provides:
 
-- `tess_sector_footprints()` for the 16 camera/CCD boundaries in one sector;
-- `target_is_visible()` and `tess_target_visibility()` for on-silicon checks;
-- `plot_tess_sector_map()` and `plot_tess_sector_sequence()` for full-sky maps;
-- `plot_tess_visibility()` for target-by-sector coverage matrices; and
+- `tess_sector_footprints()` for the 16 camera/CCD boundaries in one sector.
+- `target_is_visible()` and `tess_target_visibility()` for on-silicon checks.
+- `plot_tess_sector_map()` and `plot_tess_sector_sequence()` for full-sky maps.
+- `plot_tess_visibility()` for target-by-sector coverage matrices.
 - `animate_tess_sectors()` for fixed-frame full-sky GIFs over time.
 
 Run the maintained example to draw quick static maps of Sectors 1--4 and a dated animation of all standard sectors 1--134:

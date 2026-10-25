@@ -45,6 +45,77 @@ def test_fits_writer_preserves_data_header_narration_and_overwrite(tmp_path, cap
     np.testing.assert_array_equal(fits.getdata(path), data + 1.0)
 
 
+def test_planck_fits_read_helpers_narrate_and_preserve_results(
+    monkeypatch, capsys
+):
+    import ast
+    from types import SimpleNamespace
+    from pathlib import Path
+    from tdpy.verbosity import print as verbosity_print
+
+    monkeypatch.setenv("TDPY_VERBOSITY", "0")
+    util_path = Path(__file__).resolve().parents[1] / "tdpy" / "util.py"
+    verbosity_print(f"Reading from {util_path}...")
+    source = util_path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(util_path))
+    helpers = [
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name in {"_read_fits_data", "_open_fits"}
+    ]
+    conversion = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "retr_mapsplnkfreq"
+    )
+    direct_reads = [
+        node for node in ast.walk(conversion)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "pf"
+        and node.func.attr in {"getdata", "open"}
+    ]
+    narrated_reads = [
+        node for node in ast.walk(conversion)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in {"_read_fits_data", "_open_fits"}
+    ]
+    assert not direct_reads
+    assert len(narrated_reads) == 7
+
+    data = object()
+    hdus = object()
+    read_calls = []
+    open_calls = []
+    namespace = {
+        "pf": SimpleNamespace(
+            getdata=lambda path, *args, **kwargs: read_calls.append((path, args, kwargs)) or data,
+            open=lambda path, *args, **kwargs: open_calls.append((path, args, kwargs)) or hdus,
+        ),
+        "print": verbosity_print,
+    }
+    exec(
+        compile(ast.Module(body=helpers, type_ignores=[]), str(util_path), "exec"),
+        namespace,
+    )
+    monkeypatch.setenv("TDPY_VERBOSITY", "0")
+    assert namespace["_read_fits_data"]("map.fits", 1) is data
+    assert namespace["_open_fits"]("bandpass.fits") is hdus
+    assert capsys.readouterr().out == ""
+
+    read_calls.clear()
+    open_calls.clear()
+    monkeypatch.setenv("TDPY_VERBOSITY", "1")
+    assert namespace["_read_fits_data"]("map.fits", 1) is data
+    assert namespace["_open_fits"]("bandpass.fits") is hdus
+    assert read_calls == [("map.fits", (1,), {})]
+    assert open_calls == [("bandpass.fits", (), {})]
+    assert capsys.readouterr().out == (
+        "Reading from map.fits...\nReading from bandpass.fits...\n"
+    )
+
+
 def test_diffuse_map_writer_uses_shared_fits_output(tmp_path, monkeypatch):
     from astropy.io import fits
     from unittest.mock import Mock
@@ -64,6 +135,87 @@ def test_diffuse_map_writer_uses_shared_fits_output(tmp_path, monkeypatch):
     print(f"Reading from {path}...")
     np.testing.assert_array_equal(fits.getdata(path), np.repeat(diffuse_map[:, :, None], 2, axis=2))
     util.writ_sbrtfdfm(numbside=1)
+
+
+def test_text_writer_uses_exact_narration_and_respects_verbosity(
+    tmp_path, monkeypatch, capsys
+):
+    from tdpy import util
+    from tdpy.verbosity import print as verbosity_print
+
+    path = tmp_path / "nested" / "note.txt"
+    monkeypatch.setenv("TDPY_VERBOSITY", "0")
+    util.write_text(path, "quiet")
+    assert capsys.readouterr().out == ""
+    verbosity_print(f"Reading from {path}...")
+    assert path.read_text(encoding="utf-8") == "quiet"
+    assert capsys.readouterr().out == ""
+
+    monkeypatch.setenv("TDPY_VERBOSITY", "1")
+    util.write_text(path, "verbose")
+    verbosity_print(f"Reading from {path}...")
+    assert path.read_text(encoding="utf-8") == "verbose"
+    assert capsys.readouterr().out == (
+        f"Writing to {path}...\nReading from {path}...\n"
+    )
+
+
+def test_fermi_diffuse_model_reader_narrates_fits_path(
+    tmp_path, monkeypatch, capsys
+):
+    import ast
+    import os
+    from pathlib import Path
+    from scipy import interpolate
+    from tdpy.verbosity import print as verbosity_print
+
+    monkeypatch.setenv("TDPY_VERBOSITY", "0")
+    util_path = Path(__file__).resolve().parents[1] / "tdpy" / "util.py"
+    print(f"Reading from {util_path}...")
+    tree = ast.parse(util_path.read_text(encoding="utf-8"), filename=str(util_path))
+    function = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "retr_sbrtfdfm"
+    )
+    read_calls = []
+
+    def getdata(path, extension):
+        read_calls.append((path, extension))
+        if extension == 0:
+            return np.arange(12, dtype=float).reshape(3, 2, 2) + 1.0
+        return np.array([1000.0, 2000.0, 4000.0])
+
+    namespace = {
+        "np": np,
+        "os": os,
+        "get_data_path": lambda: str(tmp_path),
+        "pf": type("Fits", (), {"getdata": staticmethod(getdata)}),
+        "cart_heal": lambda image, numbside: np.full(12, image.sum()),
+        "interpolate": interpolate,
+        "trapz": np.trapezoid,
+        "print": verbosity_print,
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), str(util_path), "exec"),
+        namespace,
+    )
+    capsys.readouterr()
+    path = os.path.join(str(tmp_path), "gll_iem_v06.fits")
+    bins = np.array([1.0, 2.0, 4.0])
+
+    monkeypatch.setenv("TDPY_VERBOSITY", "0")
+    quiet_result = namespace["retr_sbrtfdfm"](bins, numbside=1)
+    assert read_calls == [(path, 0), (path, 1)]
+    assert quiet_result.shape == (2, 12)
+    assert np.isfinite(quiet_result).all()
+    assert capsys.readouterr().out == ""
+
+    read_calls.clear()
+    monkeypatch.setenv("TDPY_VERBOSITY", "1")
+    verbose_result = namespace["retr_sbrtfdfm"](bins, numbside=1)
+    np.testing.assert_array_equal(verbose_result, quiet_result)
+    assert read_calls == [(path, 0), (path, 1)]
+    assert capsys.readouterr().out == f"Reading from {path}...\n"
 
 
 @pytest.mark.parametrize('as_string', [False, True])

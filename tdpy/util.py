@@ -57,7 +57,7 @@ def narrate(typeverb, message, level=1):
 def write_text(path, text, mode='w'):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    print(f'Writing to {path}')
+    print(f'Writing to {path}...')
     with path.open(mode) as outfile: outfile.write(text)
 
 
@@ -2727,6 +2727,16 @@ def retr_mapspnts(lgal, bgal, stdv, flux, numbside=256, typeverb=1):
     return mapspnts
 
 
+def _read_fits_data(path, *args, **kwargs):
+    print(f"Reading from {path}...")
+    return pf.getdata(path, *args, **kwargs)
+
+
+def _open_fits(path):
+    print(f"Reading from {path}...")
+    return pf.open(path)
+
+
 def retr_mapsplnkfreq(indxpixloutprofi=None, numbsideoutp=256, indxfreqrofi=None):
 
     numbside = 2048
@@ -2750,10 +2760,8 @@ def retr_mapsplnkfreq(indxpixloutprofi=None, numbsideoutp=256, indxfreqrofi=None
     pathsbrt = path + 'plnksbrt_%s.fits' % rtag
     pathsbrtstdv = path + 'plnksbrtstdv_%s.fits' % rtag
     if os.path.isfile(pathsbrt) and os.path.isfile(pathsbrtstdv):
-        print('Reading %s...' % pathsbrt)
-        mapsplnkfreq = pf.getdata(pathsbrt)
-        print('Reading %s...' % pathsbrtstdv)
-        mapsplnkfreqstdv= pf.getdata(pathsbrtstdv)
+        mapsplnkfreq = _read_fits_data(pathsbrt)
+        mapsplnkfreqstdv = _read_fits_data(pathsbrtstdv)
     else:
         mapsplnkfreq = np.zeros((numbfreq, numbpixl))
         mapsplnkfreqstdv = np.zeros((numbfreq, numbpixl))
@@ -2774,10 +2782,10 @@ def retr_mapsplnkfreq(indxpixloutprofi=None, numbsideoutp=256, indxfreqrofi=None
                 strgcols = 'I_STOKES'
             strg = strgfrst + '%s' % strgfreq[k][1:] + strgseco
         
-            mapsinpt = pf.getdata(path + strg, 1)[strgcols]
+            mapsinpt = _read_fits_data(path + strg, 1)[strgcols]
             numbpixlinpt = mapsinpt.size
             numbsideinpt = int(np.sqrt(numbpixlinpt / 12))
-            mapsplnkfreq[k, :] = pf.getdata(path + strg, 1)[strgcols]
+            mapsplnkfreq[k, :] = _read_fits_data(path + strg, 1)[strgcols]
             mapsplnkfreq[k, :] = hp.reorder(mapsplnkfreq[k, :], n2r=True)
         
             # change units of the sky maps to Jy/sr
@@ -2788,12 +2796,12 @@ def retr_mapsplnkfreq(indxpixloutprofi=None, numbsideoutp=256, indxfreqrofi=None
                     if strgfreq[k][1] == '0':
                         strg = 'LFI_RIMO_R2.50'
                         strgextn = 'BANDPASS_%s' % strgfreq[k][1:]
-                        freqband = pf.open(path + '%s.fits' % strg)[strgextn].data['WAVENUMBER'][1:] * 1e9
+                        freqband = _open_fits(path + '%s.fits' % strg)[strgextn].data['WAVENUMBER'][1:] * 1e9
                     else:
                         strg = 'plnk/HFI_RIMO_R2.00'
                         strgextn = 'BANDPASS_F%s' % strgfreq[k][1:]
-                        freqband = 1e2 * velolght * pf.open(path + '%s.fits' % strg)[strgextn].data['WAVENUMBER'][1:]
-                    tranband = pf.open(path + '%s.fits' % strg)[strgextn].data['TRANSMISSION'][1:]
+                        freqband = 1e2 * velolght * _open_fits(path + '%s.fits' % strg)[strgextn].data['WAVENUMBER'][1:]
+                    tranband = _open_fits(path + '%s.fits' % strg)[strgextn].data['TRANSMISSION'][1:]
                     indxfreqbandgood = np.where(tranband > 1e-6)[0]
                     indxfreqbandgood = np.arange(np.amin(indxfreqbandgood), np.amax(indxfreqbandgood) + 1)
         
@@ -3788,6 +3796,7 @@ def retr_sbrtfdfm(binsener, numbside=256, vfdm=7):
     if vfdm == 7:
         path += 'gll_iem_v06.fits'
     
+    print(f"Reading from {path}...")
     sbrtcart = pf.getdata(path, 0) * 1e3 # [1/cm^2/s/sr/GeV]
     enerfdfm = np.array(pf.getdata(path, 1).tolist()).flatten() * 1e-3 # [GeV]
     sbrtfdfmheal = np.zeros((enerfdfm.size, numbpixl))

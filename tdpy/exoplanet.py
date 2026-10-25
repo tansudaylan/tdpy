@@ -617,8 +617,6 @@ def plot_exoplanet_discovery_timeline(
     axis.set_xlim(years[0] - 0.6, years[-1] + 0.6)
     tick_step = 1 if years.size <= 16 else 2
     axis.set_xticks(years[::tick_step])
-    axis.grid(axis="y", color="#D8DEDF", linewidth=0.7, alpha=0.8)
-    axis.set_axisbelow(True)
     axis.spines[["top", "right"]].set_visible(False)
     figure.legend(
         method_handles + target_handles,
@@ -678,9 +676,6 @@ def plot_exoplanet_period_radius(
     axis.set_yscale("log")
     axis.set_xlabel("Orbital period [day]")
     axis.set_ylabel("Planet radius [Earth radii]")
-    axis.grid(which="major", color="#D8DEDF", linewidth=0.7, alpha=0.8)
-    axis.grid(which="minor", color="#E8ECED", linewidth=0.5, alpha=0.6)
-    axis.set_axisbelow(True)
     axis.spines[["top", "right"]].set_visible(False)
     axis.legend(loc="lower right", fontsize=8, frameon=True, framealpha=0.95)
     figure.tight_layout()
