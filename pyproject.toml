@@ -35,6 +35,11 @@ dependencies = [
 
 [project.optional-dependencies]
 bokeh = ["bokeh>=3.4"]
+healpix = ["healpy"]
+
+[project.urls]
+Homepage = "https://github.com/tansudaylan/tdpy"
+Repository = "https://github.com/tansudaylan/tdpy"
 
 [tool.setuptools.packages.find]
 include = ["tdpy*"]

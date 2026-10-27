@@ -1,17 +1,14 @@
-"""Shared numerical and visualization utilities for the active astrophysics stack.
+"""Numerical, catalog, and figure-output utilities for astrophysics.
 
-This package is the canonical shared foundation for reusable scientific helpers
-and plotting routines across the ecosystem. New shared numerical functionality
-should live here unless there is a compelling repository-specific exception.
+The public exports include orbital geometry, numerical transforms, archive
+queries, point-spread profiles, catalog annotations, and themed figure output.
+Additional utility exports are loaded on demand.
 """
 
 from importlib import import_module
 import sys
 
 import numpy as np
-
-if not hasattr(np, 'trapz'):
-    np.trapz = np.trapezoid
 
 from .astro import *
 from .cli import dispatch_cli

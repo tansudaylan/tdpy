@@ -546,3 +546,13 @@ def test_temperatures_roche_and_densities():
     # Planetary escape velocity
     v_esc_earth = planetary_escape_velocity(1.0, 1.0)
     assert v_esc_earth == pytest.approx(11.2)
+
+
+def test_stellar_bulk_density_preserves_default_and_custom_solar_normalizations():
+    from tdpy.exoplanet import stellar_bulk_density
+
+    assert stellar_bulk_density(1.0, 1.0) == pytest.approx(1.408)
+    np.testing.assert_allclose(
+        stellar_bulk_density([1.0, 2.0], [1.0, 2.0], solar_density_g_cm3=1.4),
+        [1.4, 0.35],
+    )

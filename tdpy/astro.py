@@ -20,6 +20,7 @@ from astropy.time import Time
 from astropy.utils import iers
 
 from .plotting import save_bokeh_html, save_figure
+from .numerics import has_masked_or_complex_values
 
 
 @dataclass(frozen=True)
@@ -741,6 +742,45 @@ def format_equatorial_coordinates(
     ra_str = coord.ra.to_string(unit=u.hour, sep=":", precision=precision, pad=True)
     dec_str = coord.dec.to_string(unit=u.deg, sep=":", precision=precision, alwayssign=True, pad=True)
     return ra_str, dec_str
+
+
+def ccd_photometric_precision(
+    source_rate_e_s, exposure_seconds, *, sky_rate_e_s_pixel=0.0,
+    dark_rate_e_s_pixel=0.0, read_noise_e=0.0, aperture_pixels=1.0,
+    systematic_floor_ppm=0.0,
+):
+    """Return single-integration relative precision [ppm] using Astropy's CCD SNR.
+
+    Source rate is the detected aperture rate after throughput and aperture
+    losses. Background/dark rates are per pixel and read noise is per read.
+    Inputs broadcast; each exposure has one read. A supplied systematic floor
+    is added in quadrature. Crowding, saturation, correlated noise, and the
+    uncertainty of a separately estimated background are excluded.
+    """
+    from astropy.stats import signal_to_noise_oir_ccd
+
+    arrays = []
+    for value in (source_rate_e_s, exposure_seconds, sky_rate_e_s_pixel,
+                  dark_rate_e_s_pixel, read_noise_e, aperture_pixels, systematic_floor_ppm):
+        if (has_masked_or_complex_values(value)
+                or np.asarray(value).dtype.kind not in "iuf"):
+            raise ValueError("CCD precision inputs must be unmasked real numbers")
+        arrays.append(np.asarray(value, dtype=float))
+    source, exposure, sky, dark, read_noise, pixels, floor = np.broadcast_arrays(*arrays)
+    if any(not np.isfinite(value).all() for value in (source, exposure, sky, dark, read_noise, pixels, floor)):
+        raise ValueError("CCD precision inputs must be finite")
+    if (np.any(source <= 0) or np.any(exposure <= 0) or np.any(pixels <= 0)
+            or any(np.any(value < 0) for value in (sky, dark, read_noise, floor))):
+        raise ValueError("Source rate, exposure and aperture must be positive; noise terms cannot be negative")
+    try:
+        with np.errstate(over="raise", divide="raise", invalid="raise", under="ignore"):
+            snr = signal_to_noise_oir_ccd(exposure, source, sky, dark, read_noise, pixels)
+            precision = np.hypot(1e6 / snr, floor)
+    except FloatingPointError as error:
+        raise ValueError("CCD precision inputs exceed the finite numeric range") from error
+    if not np.isfinite(precision).all():
+        raise ValueError("CCD precision must be finite")
+    return float(precision) if precision.ndim == 0 else precision
 
 
 def photometric_noise(

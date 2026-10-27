@@ -9,22 +9,23 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from importlib import import_module, util as import_util
 
 import numpy as np
 
-if not hasattr(np, 'trapz'):
-    np.trapz = np.trapezoid
-
-# Re-export the actual package implementation. The root-level ``__init__.py`` may
-# be imported as a top-level module by legacy scripts, in which case a relative
-# import is unavailable. Fall back to the real package path in that case.
-try:
-    from .tdpy import *  # noqa: F401,F403
-except ImportError:
-    pkg_root = Path(__file__).resolve().parent
+pkg_root = Path(__file__).resolve().parent
+if __name__ == 'tdpy':
+    package_directory = pkg_root / 'tdpy'
+    specification = import_util.spec_from_file_location(
+        'tdpy', package_directory / '__init__.py',
+        submodule_search_locations=[str(package_directory)],
+    )
+    _tdpy = import_util.module_from_spec(specification)
+    sys.modules['tdpy'] = _tdpy
+    specification.loader.exec_module(_tdpy)
+else:
     sys.path.insert(0, str(pkg_root))
-    import tdpy as _tdpy  # type: ignore
-
+    _tdpy = import_module('tdpy')
     for _name in dir(_tdpy):
         if not _name.startswith('_'):
             globals()[_name] = getattr(_tdpy, _name)
@@ -34,7 +35,4 @@ except ImportError:
 
 def __getattr__(name):
     """Forward lazy legacy exports to the package implementation."""
-    implementation = sys.modules.get(f'{__name__}.tdpy', globals().get('_tdpy'))
-    if implementation is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    return getattr(implementation, name)
+    return getattr(_tdpy, name)

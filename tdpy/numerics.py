@@ -21,6 +21,11 @@ def gaussian_sigma_from_fwhm(fwhm):
     return np.asanyarray(fwhm) * _gaussian_fwhm_to_sigma
 
 
+def has_masked_or_complex_values(values):
+    """Return whether an input is masked or has a complex-valued dtype."""
+    return np.ma.is_masked(values) or np.iscomplexobj(values)
+
+
 def build_kde_prior_from_samples(samples, low=None, high=None, bandwidth=None,
                                  grid_size=4096, *, normalization="trapezoid"):
     """Build density and inverse-CDF grids for a one-dimensional KDE prior.
@@ -237,9 +242,36 @@ def logpdf_gaus(value, mean, standard_deviation):
     """Return normalized Gaussian log densities without density underflow.
 
     Inputs broadcast as in SciPy's normal distribution. Values, means, and
-    standard deviations must be expressed in the same units.
+    standard deviations must be expressed in the same units. Finite tails are
+    recovered when subtracting the value and mean overflows.
     """
-    return _norm.logpdf(value, loc=mean, scale=standard_deviation)
+    with np.errstate(over="ignore", under="ignore", divide="ignore", invalid="ignore"):
+        density = _norm.logpdf(value, loc=mean, scale=standard_deviation)
+        values, means, deviations = np.broadcast_arrays(
+            np.asarray(value, dtype=float),
+            np.asarray(mean, dtype=float),
+            np.asarray(standard_deviation, dtype=float),
+        )
+        valid_parameters = np.isfinite(means) & np.isfinite(deviations) & (deviations > 0.0)
+        needs_fallback = valid_parameters & ~np.isfinite(density)
+        if np.any(needs_fallback):
+            difference = values - means
+            standardized = difference / deviations
+            overflowed_difference = (
+                ~np.isfinite(difference) & np.isfinite(values) & np.isfinite(means)
+            )
+            standardized = np.where(
+                overflowed_difference,
+                values / deviations - means / deviations,
+                standardized,
+            )
+            fallback = (
+                (-0.5 * standardized) * standardized
+                - np.log(deviations)
+                - 0.5 * np.log(2.0 * np.pi)
+            )
+            density = np.where(needs_fallback, fallback, density)
+    return density.item() if np.ndim(density) == 0 else density
 
 
 def pdfn_lnor(value, mean, standard_deviation):

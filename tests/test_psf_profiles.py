@@ -1,8 +1,67 @@
 import numpy as np
+import pytest
 from types import SimpleNamespace
 
 import tdpy
 import tdpy.util
+
+
+@pytest.mark.parametrize('width', [0.05, 0.2, 1.0, 2.0])
+def test_spherical_gaussian_normalization_has_unit_solid_angle_integral(width):
+    from scipy.integrate import quad
+
+    with np.errstate(all='raise'):
+        normalization = tdpy.retr_psfngausnorm(width)
+    integral, _ = quad(
+        lambda angle: np.exp(-0.5 * (angle / width)**2) * np.sin(angle),
+        0.0, np.pi, epsabs=1e-12, epsrel=1e-12,
+    )
+
+    assert np.isfinite(normalization)
+    assert normalization > 0.0
+    assert normalization * 2.0 * np.pi * integral == pytest.approx(1.0, rel=1e-12)
+
+
+def test_spherical_gaussian_normalization_preserves_array_shape_and_values():
+    widths = np.array([[0.05, 0.2], [1.0, 2.0]])  # [rad]
+    original = widths.copy()
+
+    with np.errstate(all='raise'):
+        result = tdpy.retr_psfngausnorm(widths)
+
+    expected = np.array([tdpy.retr_psfngausnorm(width) for width in widths.ravel()]).reshape(widths.shape)
+    np.testing.assert_array_equal(result, expected)
+    np.testing.assert_array_equal(widths, original)
+
+
+def test_spherical_point_map_matches_great_circle_gaussians():
+    pytest.importorskip('healpy')
+    longitude = np.array([10.0, -30.0])  # [deg]
+    latitude = np.array([20.0, -15.0])  # [deg]
+    width = 12.0  # [deg]
+    flux = np.array([3.0, 7.0])
+    originals = [values.copy() for values in (longitude, latitude, flux)]
+    grid_longitude, grid_latitude, pixel_count, pixel_area = tdpy.retr_healgrid(16)
+    longitude_difference = np.deg2rad(grid_longitude[:, None] - longitude[None, :])
+    grid_latitude_radians = np.deg2rad(grid_latitude[:, None])
+    source_latitude_radians = np.deg2rad(latitude[None, :])
+    cosine_distance = (
+        np.sin(grid_latitude_radians) * np.sin(source_latitude_radians)
+        + np.cos(grid_latitude_radians) * np.cos(source_latitude_radians) * np.cos(longitude_difference)
+    )
+    separation = np.arccos(np.clip(cosine_distance, -1.0, 1.0))  # [rad]
+    width_radians = np.deg2rad(width)  # [rad]
+    expected = pixel_area * tdpy.retr_psfngausnorm(width_radians) * np.sum(
+        flux[None, :] * np.exp(-0.5 * (separation / width_radians)**2), axis=1
+    )
+
+    with np.errstate(all='raise'):
+        result = tdpy.retr_mapspnts(longitude, latitude, width, flux, numbside=16)
+
+    assert result.shape == (pixel_count,)
+    np.testing.assert_allclose(result, expected, rtol=2e-12, atol=1e-16)
+    for values, original in zip((longitude, latitude, flux), originals):
+        np.testing.assert_array_equal(values, original)
 
 
 def _assert_profile_formulas(scaldevi, frac, sigc, gamc, sigt, gamt):

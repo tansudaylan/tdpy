@@ -51,3 +51,9 @@ Serialization and workflows
 
 .. automodule:: tdpy.workflow
    :members:
+
+Command-line helpers
+--------------------
+
+.. automodule:: tdpy.cli
+   :members:

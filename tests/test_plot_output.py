@@ -60,6 +60,11 @@ def test_save_figure_writes_styled_plot(tmp_path, capsys, typefileplot, typeplot
     assert figure.get_facecolor() == color
     assert axis.get_facecolor() == color
     assert capsys.readouterr().out == 'Writing to %s...\n' % path
+    if typefileplot == 'png':
+        from PIL import Image
+
+        with Image.open(path) as saved:
+            np.testing.assert_allclose(saved.info['dpi'], [300., 300.], atol=0.01)
     plt.close(figure)
 
 
@@ -81,11 +86,72 @@ def test_write_animation_pads_frames_and_shares_one_palette(tmp_path):
         tdpy.write_animation([], tmp_path / 'empty.gif')
 
 
+@pytest.mark.parametrize('typefileplot', ['png', 'pdf'])
 @pytest.mark.parametrize('typeplotback', ['white', 'dark'])
-def test_plot_style_is_scoped_and_renders_theme(typeplotback):
+@pytest.mark.parametrize('projection', [None, '3d'])
+def test_save_figure_matches_document_point_size_without_changing_data(tmp_path, typefileplot, typeplotback, projection):
+    from pathlib import Path
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.text import Text
+
+    figure = plt.figure(figsize=(8.0, 6.0), layout='constrained')
+    axis = figure.add_subplot(projection=projection)
+    line, = axis.plot([0., 1., 2.], [1., 3., 2.], label='Measurements')
+    axis.set(xlabel='Position', ylabel='Value', title='Panel title')
+    axis.set_yscale('log')
+    axis.annotate('A point', (1., 3.), fontsize=7)
+    if projection == '3d':
+        axis.set_zlabel('Third coordinate')
+    axis.legend(title='Series', fontsize=8, title_fontsize=15)
+    figure.suptitle('Figure title', fontsize=19)
+    figure.legend(title='Whole figure', fontsize=9)
+    get_coordinates = line.get_data_3d if projection == '3d' else line.get_data
+    coordinates = [np.asarray(values).copy() for values in get_coordinates()]
+    labels = [text.get_text() for text in figure.findobj(match=Text) if text.get_text()]
+    settings = dict(plt.rcParams)
+
+    path = tdpy.save_figure(figure, tmp_path / 'document_font', typefileplot,
+                            typeplotback, font_size=11.0)
+
+    FigureCanvasAgg(figure).draw()
+    assert all(text.get_fontsize() == 11.0 for text in figure.findobj(match=Text))
+    for label in labels:
+        assert label in [text.get_text() for text in figure.findobj(match=Text)]
+    for actual, expected in zip(get_coordinates(), coordinates):
+        np.testing.assert_array_equal(actual, expected)
+    assert dict(plt.rcParams) == settings
+    assert Path(path).is_file()
+    plt.close(figure)
+
+
+@pytest.mark.parametrize('font_size', [0.0, -1.0, np.nan, np.inf, True, 11+0j, [10., 11.], '11', np.ma.masked])
+def test_save_figure_rejects_invalid_document_font_before_writing(tmp_path, font_size):
+    figure, axis = plt.subplots()
+    axis.plot([0, 1], [1, 0])
+    with pytest.raises(ValueError, match='font_size'):
+        tdpy.save_figure(figure, tmp_path / 'not_created/invalid.png', font_size=font_size)
+    assert not (tmp_path / 'not_created').exists()
+    plt.close(figure)
+
+
+def test_save_figure_omitted_document_font_retains_caller_sizes(tmp_path):
+    figure, axis = plt.subplots()
+    axis.set_title('Caller title', fontsize=17)
+    note = axis.annotate('Caller annotation', (0.5, 0.5), fontsize=8)
+    tdpy.save_figure(figure, tmp_path / 'caller_font.png')
+    assert axis.title.get_fontsize() == 17
+    assert note.get_fontsize() == 8
+    plt.close(figure)
+
+
+@pytest.mark.parametrize('typeplotback', ['white', 'dark'])
+def test_plot_style_is_scoped_and_renders_theme(typeplotback, monkeypatch):
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from matplotlib.colors import to_rgba
+    from matplotlib.patches import BoxStyle
 
+    monkeypatch.setitem(plt.rcParams, 'legend.frameon', False)
+    monkeypatch.setitem(plt.rcParams, 'legend.fancybox', False)
     original = dict(plt.rcParams)
     background, foreground = tdpy.plot_background_colors(typeplotback)
     with tdpy.plot_style(typeplotback):
@@ -96,6 +162,8 @@ def test_plot_style_is_scoped_and_renders_theme(typeplotback):
         assert axis.get_facecolor() == to_rgba(background)
         assert axis.xaxis.label.get_color() == foreground
         assert to_rgba(legend.get_texts()[0].get_color()) == to_rgba(foreground)
+        assert legend.get_frame_on()
+        assert isinstance(legend.get_frame().get_boxstyle(), BoxStyle.Round)
         FigureCanvasAgg(figure).draw()
         np.testing.assert_array_equal(
             np.asarray(figure.canvas.buffer_rgba())[0, 0],
@@ -107,20 +175,22 @@ def test_plot_style_is_scoped_and_renders_theme(typeplotback):
 
 @pytest.mark.parametrize('typeplotback', ['white', 'dark'])
 @pytest.mark.parametrize('projection', [None, '3d'])
-def test_apply_plot_theme_styles_existing_axes_and_legends(typeplotback, projection):
+@pytest.mark.parametrize('frame_on', [False, True])
+def test_apply_plot_theme_styles_existing_axes_and_legends(typeplotback, projection, frame_on):
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from matplotlib.colors import to_rgba
+    from matplotlib.patches import BoxStyle
 
     figure = plt.figure()
     axis = figure.add_subplot(projection=projection)
-    line, = axis.plot([0, 1], [0, 1], color='red', label='data')
+    line, = axis.plot([0, 1], [0, 1], color='red', marker='o', label='data')
     axis.set(xlabel='x', ylabel='y', title='Title')
     axis.set_title('Left', loc='left')
     neutral_text = axis.annotate('Neutral', (0.3, 0.3), color='black')
     colored_text = axis.annotate('Colored', (0.6, 0.6), color='red')
     axis.grid(True)
-    legend = axis.legend(title='Legend')
-    figure_legend = figure.legend()
+    legend = axis.legend(title='Legend', frameon=frame_on, fancybox=False)
+    figure_legend = figure.legend(frameon=frame_on, fancybox=False)
     figure.suptitle('Figure title')
     status_text = figure.text(0.5, 0.02, 'Status', color='red')
     original = dict(plt.rcParams)
@@ -140,9 +210,13 @@ def test_apply_plot_theme_styles_existing_axes_and_legends(typeplotback, project
     assert figure._suptitle.get_color() == foreground
     assert status_text.get_color() == 'red'
     for current in (legend, figure_legend):
+        assert current.get_frame_on()
+        assert isinstance(current.get_frame().get_boxstyle(), BoxStyle.Round)
         assert current.get_frame().get_facecolor() == to_rgba(background)
         assert current.get_frame().get_alpha() == 1.0
         assert all(text.get_color() == foreground for text in current.get_texts())
+        assert current.get_lines()[0].get_marker() == line.get_marker()
+        assert current.get_lines()[0].get_color() == line.get_color()
     assert line.get_color() == 'red'
     assert neutral_text.get_color() == foreground
     assert colored_text.get_color() == 'red'
@@ -158,6 +232,58 @@ def test_save_current_figure_uses_active_figure(tmp_path):
 
     assert path == str(tmp_path / 'current.pdf')
     assert (tmp_path / 'current.pdf').is_file()
+    plt.close(figure)
+
+
+@pytest.mark.parametrize('typeplotback', ['white', 'dark'])
+def test_explicit_annotation_contrast_can_be_preserved_across_themes(typeplotback):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.colors import to_rgba
+    from tdpy.plotting import preserve_text_color
+
+    figure, axis = plt.subplots()
+    values = np.array([[0.0, 1.0]])
+    image = axis.imshow(values, vmin=0.0, vmax=1.0)
+    dark_cell = axis.text(0, 0, '0%', color='white')
+    bright_cell = axis.text(1, 0, '100%', color='black')
+    default_text = axis.text(0.5, 0.9, 'Default', transform=axis.transAxes, color='black')
+    figure_text = figure.text(0.5, 0.01, 'White inset', color='white')
+    for text in (dark_cell, bright_cell, figure_text):
+        assert preserve_text_color(text) is text
+
+    for selected in (typeplotback, 'dark', 'white'):
+        tdpy.apply_plot_theme(figure, selected)
+        FigureCanvasAgg(figure).draw()
+        assert to_rgba(dark_cell.get_color()) == to_rgba('white')
+        assert to_rgba(bright_cell.get_color()) == to_rgba('black')
+        assert to_rgba(figure_text.get_color()) == to_rgba('white')
+        assert default_text.get_color() == tdpy.plot_background_colors(selected)[1]
+        np.testing.assert_array_equal(image.get_array(), values)
+    plt.close(figure)
+
+
+@pytest.mark.parametrize('typeplotback', ['white', 'dark'])
+def test_rounded_legend_preserves_line_markers_and_filled_area(typeplotback):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.patches import BoxStyle
+
+    figure, axis = plt.subplots()
+    line, = axis.plot([0., 1.], [1., 2.], marker='s', color='red', label='Measured')
+    region = axis.fill_between([0., 1.], [0.8, 1.8], [1.2, 2.2],
+                               color='blue', alpha=0.3, label='Interval')
+    legend = axis.legend(fancybox=False, frameon=False)
+    coordinates = line.get_xydata().copy()
+    vertices = region.get_paths()[0].vertices.copy()
+    tdpy.apply_plot_theme(figure, typeplotback)
+    FigureCanvasAgg(figure).draw()
+    assert legend.get_frame_on() and legend.get_frame().get_alpha() == 1.
+    assert isinstance(legend.get_frame().get_boxstyle(), BoxStyle.Round)
+    assert [text.get_text() for text in legend.get_texts()] == ['Measured', 'Interval']
+    assert legend.get_lines()[0].get_marker() == line.get_marker()
+    assert legend.get_lines()[0].get_color() == line.get_color()
+    np.testing.assert_allclose(legend.get_patches()[0].get_facecolor(), region.get_facecolor()[0])
+    np.testing.assert_array_equal(line.get_xydata(), coordinates)
+    np.testing.assert_array_equal(region.get_paths()[0].vertices, vertices)
     plt.close(figure)
 
 

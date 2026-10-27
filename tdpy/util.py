@@ -29,6 +29,7 @@ import multiprocessing
 # astropy
 import astropy.coordinates, astropy.units
 import astropy.io
+from astropy.io import fits as pf
 
 import sklearn
 
@@ -83,9 +84,11 @@ def minimum_distance_to_polyline_pixels(point, line, maximum_samples=2000):
     """Return the sampled minimum distance from a display-pixel point to a line."""
     step = max(1, len(line) // maximum_samples)
     sampled_line = line[::step]
-    distances = np.hypot(
-        sampled_line[:, 0] - point[0], sampled_line[:, 1] - point[1]
-    )
+    if sampled_line.dtype.kind in 'iu' and all(isinstance(value, (int, np.integer)) for value in point):
+        offsets = (sampled_line.astype(object) - np.asanyarray(point, dtype=object)).astype(float)
+    else:
+        offsets = sampled_line - point
+    distances = np.hypot(offsets[:, 0], offsets[:, 1])
     return float(distances.min())
 
 
@@ -1303,22 +1306,22 @@ def retr_nfwp(nfwg, numbside, norm=None):
     
     lghp, bghp, numbpixl, apix = retr_healgrid(numbside)
     
-    cosigahp = cos(np.deg2rad(lghp)) * cos(np.deg2rad(bghp))
-    gahp = np.rad2deg(arccos(cosigahp))
+    cosigahp = np.cos(np.deg2rad(lghp)) * np.cos(np.deg2rad(bghp))
+    gahp = np.rad2deg(np.arccos(cosigahp))
     
     eden = 1. / (radi / rscl)**nfwg / (1. + radi / rscl)**(3. - nfwg)
-    eden *= edenlocl / interp1d(radi, eden)(radilocl)
+    eden *= edenlocl / sp.interpolate.interp1d(radi, eden)(radilocl)
     
     edengrid = np.zeros((nsadi, numbpixl))
     for i in range(nsadi):
         radigrid = np.sqrt(radilocl**2 + sadi[i]**2 - 2 * radilocl * sadi[i] * cosigahp)
-        edengrid[i, :] = interp1d(radi, eden)(radigrid)
+        edengrid[i, :] = sp.interpolate.interp1d(radi, eden)(radigrid)
 
-    edengridtotl = sum(edengrid**2, axis=0)
+    edengridtotl = np.sum(edengrid**2, axis=0)
 
     if norm is not None:
         jgahp = np.argsort(gahp)
-        edengridtotl /= interp1d(gahp[jgahp], edengridtotl[jgahp])(5.)
+        edengridtotl /= sp.interpolate.interp1d(gahp[jgahp], edengridtotl[jgahp])(5.)
         
     return edengridtotl
 
@@ -2470,24 +2473,33 @@ def summgene(varb, boolslin=False, namepara=None, varbcomp=None, boolshowuniq=Fa
 
 
 def retr_p4dm_spec(anch, part='el'):
-    
+    if anch not in ('e', 'mu', 'tau', 'b'):
+        raise ValueError('Annihilation channel must be e, mu, tau, or b.')
+    if part not in ('el', 'ph'):
+        raise ValueError('Output particle must be el or ph.')
+
     pathvisu, pathdata = retr_path('tdpy')
     if part == 'el':
         strg = 'AtProduction_positrons'
     if part == 'ph':
         strg = 'AtProduction_gammas'
     name = pathdata + 'p4dm/' + strg + '.dat'
-    p4dm = loadtxt(name)
+    print('Reading from %s...' % name)
+    p4dm = np.loadtxt(name, ndmin=2)
     
     p4dm[:, 0] *= 1e3 # [MeV]
     
-    mass = unique(p4dm[:, 0])
+    mass = np.unique(p4dm[:, 0])
     nmass = mass.size
-    numbener = p4dm.shape[0] / nmass
+    numbener = p4dm.shape[0] // nmass
     
     mult = np.zeros((numbener, nmass))
     for k in range(nmass):
         jp4dm = np.where(abs(p4dm[:, 0] - mass[k]) == 0)[0]
+        if k == 0:
+            energy_grid = p4dm[jp4dm, 1]
+        if jp4dm.size != numbener or not np.array_equal(p4dm[jp4dm, 1], energy_grid):
+            raise ValueError('Mass blocks must have matching energy grids.')
 
         if anch == 'e':
             mult[:, k] = p4dm[jp4dm, 4]
@@ -2704,14 +2716,15 @@ def retr_axis(minm=None, maxm=None, limt=None, numbpntsgrid=None, midpgrid=None,
 
 def retr_psfngausnorm(angl):
 
-    norm = np.sqrt(2. / np.pi**3) / angl / exp(-0.5 * angl**2) / \
-                    real(-erfi((angl**2 - np.pi * 1j) / np.sqrt(2) / angl) - erfi((angl**2 + np.pi * 1j) / np.sqrt(2) / angl) + 2. * erfi(angl / np.sqrt(2.)))
+    norm = np.sqrt(2. / np.pi**3) / angl / np.exp(-0.5 * angl**2) / \
+                    np.real(-erfi((angl**2 - np.pi * 1j) / np.sqrt(2) / angl) - erfi((angl**2 + np.pi * 1j) / np.sqrt(2) / angl) + 2. * erfi(angl / np.sqrt(2.)))
 
     return norm
 
 
 def retr_mapspnts(lgal, bgal, stdv, flux, numbside=256, typeverb=1):
-    
+    from healpy.rotator import angdist
+
     # lgal, bgal and stdv are in degrees
     numbpnts = lgal.size
     lgalheal, bgalheal, numbpixl, apix = retr_healgrid(numbside)
@@ -2722,7 +2735,7 @@ def retr_mapspnts(lgal, bgal, stdv, flux, numbside=256, typeverb=1):
         gridpnts = np.array([lgal[n], bgal[n]])
         angl = angdist(gridheal, gridpnts, lonlat=True)
         norm = retr_psfngausnorm(stdvradi)
-        mapspnts += apix * norm * flux[n] * exp(-0.5 * angl**2 / stdvradi**2)
+        mapspnts += apix * norm * flux[n] * np.exp(-0.5 * angl**2 / stdvradi**2)
 
     return mapspnts
 
@@ -3687,7 +3700,8 @@ def cart_heal_depr(cart, minmlgal=-180., maxmlgal=180., minmbgal=-90., maxmbgal=
 
 
 def retr_healgrid(numbside):
-    
+    import healpy as hp
+
     numbpixl = 12 * numbside**2
     apix = 4. * np.pi / numbpixl # [sr]
     thhp, phhp = hp.pixelfunc.pix2ang(numbside, np.arange(numbpixl), nest=False) # [rad]
@@ -3703,26 +3717,23 @@ def retr_isot(binsener, numbside=256):
     diffener = binsener[1:] - binsener[:-1]
     numbpixl = 12 * numbside**2
     numbener = binsener.size - 1
-    numbsamp = 10
 
     # get the best-fit isotropic surface brightness given by the Fermi-LAT collaboration
 
     pathdata = retr_path('tdpy', onlydata=True)
     path = pathdata + 'iso_P8R2_SOURCE_V6_v06.txt'
-    isotdata = loadtxt(path)
+    print('Reading from %s...' % path)
+    isotdata = np.loadtxt(path, ndmin=2)
     enerisot = isotdata[:, 0] * 1e-3 # [GeV]
     sbrtisottemp = isotdata[:, 1] * 1e3 # [1/cm^2/s/sr/GeV]
-    
-    # sampling energy grid
-    binsenersamp = np.logspace(np.log10(np.amin(binsener)), np.log10(np.amax(binsener)), numbsamp * numbener)
-    
-    # interpolate the surface brightness over the sampling energy grid
-    sbrtisottemp = interp(binsenersamp, enerisot, sbrtisottemp)
     
     # take the mean surface brightness in the desired energy bins
     sbrtisot = np.empty((numbener, numbpixl))
     for i in range(numbener):
-        sbrtisot[i, :] = trapz(sbrtisottemp[i*numbsamp:(i+1)*numbsamp], binsenersamp[i*numbsamp:(i+1)*numbsamp]) / diffener[i]
+        lower, upper = binsener[i:i + 2]  # [GeV]
+        energy_nodes = np.concatenate(([lower], enerisot[(enerisot > lower) & (enerisot < upper)], [upper]))  # [GeV]
+        brightness = np.interp(energy_nodes, enerisot, sbrtisottemp)  # [1/cm^2/s/sr/GeV]
+        sbrtisot[i, :] = np.trapezoid(brightness, energy_nodes) / diffener[i]
         
     return sbrtisot
 
@@ -4167,15 +4178,19 @@ def retr_path(strg, pathextndata=None, pathextnimag=None, rtag=None, onlyimag=Fa
         return pathdata
 
 
-def conv_rascdecl(args):
+def conv_rascdecl(args, *components):
+    """Convert RA h/m/s and signed declination d/m/s to decimal degrees."""
+    if components:
+        args = (args, *components)
 
-    rasc = args[0] * 8 + args[1] / 60. + args[2] / 3600.
-    decl = args[3] + args[4] / 60. + args[5] / 3600.
+    rasc = 15. * (args[0] + args[1] / 60. + args[2] / 3600.)  # [deg]
+    decl = np.copysign(abs(args[3]) + args[4] / 60. + args[5] / 3600., args[3])  # [deg]
 
     return rasc, decl
 
 
 def smth_heal(maps, scalsmth, mpol=False, retrfull=False, numbsideoutp=None, indxpixlmask=None):
+    import healpy as hp
 
     if mpol:
         mpolsmth = scalsmth
@@ -4185,7 +4200,7 @@ def smth_heal(maps, scalsmth, mpol=False, retrfull=False, numbsideoutp=None, ind
     numbpixl = maps.size
     numbside = int(np.sqrt(numbpixl / 12))
     numbmpol = 3 * numbside
-    maxmmpol = 3. * numbside - 1.
+    maxmmpol = 3 * numbside - 1
     mpolgrid, temp = hp.Alm.getlm(lmax=maxmmpol)
     mpol = np.arange(maxmmpol + 1.)
     
@@ -4193,7 +4208,7 @@ def smth_heal(maps, scalsmth, mpol=False, retrfull=False, numbsideoutp=None, ind
         numbsideoutp = numbside
     
     if indxpixlmask is not None:
-        mapsoutp = copy(maps)
+        mapsoutp = maps.copy()
         mapsoutp[indxpixlmask] = hp.UNSEEN
         mapsoutp = hp.ma(mapsoutp)
         almctemp = hp.map2alm(maps)
@@ -4202,13 +4217,13 @@ def smth_heal(maps, scalsmth, mpol=False, retrfull=False, numbsideoutp=None, ind
     
     almc = hp.map2alm(mapsoutp)
 
-    wght = exp(-0.5 * (mpolgrid / mpolsmth)**2)
+    wght = np.exp(-0.5 * (mpolgrid / mpolsmth)**2)
     almc *= wght
     
-    mapsoutp = hp.alm2map(almc[np.where(mpolgrid < 3 * numbsideoutp)], numbsideoutp, verbose=False)
+    mapsoutp = hp.alm2map(almc[np.where(mpolgrid < 3 * numbsideoutp)], numbsideoutp)
 
     if retrfull:
-        return mapsoutp, almc, mpol, exp(-0.5 * (mpol / mpolsmth)**2)
+        return mapsoutp, almc, mpol, np.exp(-0.5 * (mpol / mpolsmth)**2)
     else:
         return mapsoutp
 

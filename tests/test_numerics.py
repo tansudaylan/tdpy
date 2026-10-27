@@ -17,6 +17,7 @@ from tdpy.numerics import (
     find_nearest_index,
     grouped_polynomial_design_matrix,
     gaussian_sigma_from_fwhm,
+    has_masked_or_complex_values,
     logpdf_gaus,
     logmeanexp,
     rescale_range,
@@ -34,6 +35,58 @@ from tdpy.numerics import (
     template_goodness_of_fit,
 )
 from tdpy.util import cdfn_expo, gdatstrtpcat
+
+
+@pytest.mark.parametrize('masked', [False, True])
+@pytest.mark.parametrize('multipole_scale', [False, True])
+@pytest.mark.parametrize('return_full', [False, True])
+@pytest.mark.parametrize('output_side', [2, 4, 8])
+def test_native_healpix_smoothing_matches_harmonic_filter(masked, multipole_scale, return_full, output_side):
+    healpy = pytest.importorskip('healpy')
+    from tdpy.util import smth_heal
+
+    side = 4
+    polar_angle, azimuth = healpy.pix2ang(side, np.arange(12 * side**2))  # [rad]
+    values = 2.0 + 0.3 * np.cos(polar_angle) + 0.2 * np.sin(polar_angle) * np.cos(azimuth)
+    original = values.copy()
+    mask_indices = np.array([0, 17]) if masked else None
+    prepared = values.copy()
+    if masked:
+        prepared[mask_indices] = healpy.UNSEEN
+        prepared = healpy.ma(prepared)
+    bandwidth = 6.0
+    scale = bandwidth if multipole_scale else 180.0 / bandwidth  # [deg] when not a multipole
+    multipoles = np.arange(3 * side)
+    transfer = np.exp(-0.5 * (multipoles / bandwidth)**2)
+    expected_coefficients = healpy.almxfl(healpy.map2alm(prepared), transfer)
+    resized = healpy.resize_alm(expected_coefficients, 3 * side - 1, 3 * side - 1,
+                                3 * output_side - 1, 3 * output_side - 1)
+    expected = healpy.alm2map(resized, output_side)
+
+    result = smth_heal(values, scale, mpol=multipole_scale,
+                       retrfull=return_full, indxpixlmask=mask_indices, numbsideoutp=output_side)
+
+    if return_full:
+        result, coefficients, returned_multipoles, returned_transfer = result
+        np.testing.assert_allclose(coefficients, expected_coefficients, rtol=1e-13, atol=1e-14)
+        np.testing.assert_array_equal(returned_multipoles, multipoles)
+        np.testing.assert_allclose(returned_transfer, transfer, rtol=1e-14)
+    assert result.shape == (12 * output_side**2,)
+    np.testing.assert_allclose(result, expected, rtol=1e-13, atol=1e-14)
+    np.testing.assert_array_equal(values, original)
+
+
+@pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        ([1.0, 2.0], False),
+        (np.ma.array([1.0, 2.0], mask=False), False),
+        (np.ma.array([1.0, 2.0], mask=[False, True]), True),
+        (np.array([1.0 + 0.0j]), True),
+    ],
+)
+def test_has_masked_or_complex_values(values, expected):
+    assert has_masked_or_complex_values(values) is expected
 
 
 @pytest.mark.parametrize("axis", [None, 0, -1, (0, 2), ()])
@@ -154,6 +207,24 @@ def test_gaussian_log_density_remains_finite_when_density_underflows():
     actual = logpdf_gaus(1000.0, 0.0, 1.0)
     assert np.isfinite(actual)
     assert actual == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("value", "mean", "deviation"),
+    [
+        (1e308, -1e308, 1e308),
+        (-1e308, 1e308, 1e308),
+        (np.finfo(float).max, -np.finfo(float).max, np.finfo(float).max),
+    ],
+)
+def test_gaussian_log_density_recovers_finite_tail_after_subtraction_overflow(value, mean, deviation):
+    expected = -2.0 - np.log(deviation) - 0.5 * np.log(2.0 * np.pi)
+
+    with np.errstate(all="raise"):
+        actual = logpdf_gaus(value, mean, deviation)
+
+    assert np.isfinite(actual)
+    assert actual == pytest.approx(expected, rel=2e-15)
 
 
 @pytest.mark.parametrize("widths", [1.0, [1.0, 2.0, 4.0], np.array([[1.0, 2.0], [3.0, 4.0]])])

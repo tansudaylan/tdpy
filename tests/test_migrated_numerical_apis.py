@@ -5,6 +5,37 @@ import tdpy
 from tdpy.exoplanet import quadratic_limb_darkening
 
 
+@pytest.mark.parametrize('import_layout', ['package', 'repository-root', 'legacy'])
+@pytest.mark.parametrize('provided_alias', [False, True])
+def test_tdpy_import_does_not_recreate_removed_numpy_api(tmp_path, import_layout, provided_alias):
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    repository = Path(__file__).resolve().parents[1]
+    source_root = repository.parent if import_layout == 'repository-root' else repository
+    environment = os.environ.copy()
+    environment['PYTHONPATH'] = str(source_root)
+    statement = 'import __init__ as tdpy' if import_layout == 'legacy' else 'import tdpy'
+    alias_setup = "np.trapz = lambda values: 'caller alias'\n" if provided_alias else ''
+    code = (
+        "import numpy as np\n"
+        f"{alias_setup}"
+        "original = getattr(np, 'trapz', None)\n"
+        f"{statement}\n"
+        "assert getattr(np, 'trapz', None) is original\n"
+        "np.testing.assert_allclose(tdpy.grid_quantiles(np.array([0., 1.]), np.ones(2), [0.5]), [0.5])\n"
+        "import tdpy.plotting as plotting\n"
+        "assert tdpy.plot_style is plotting.plot_style\n"
+        "assert callable(tdpy.regr)\n"
+    )
+
+    completed = subprocess.run([sys.executable, '-c', code], cwd=tmp_path, env=environment,
+                               capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr
+
+
 @pytest.mark.parametrize(
     ('coefficients', 'label'),
     (

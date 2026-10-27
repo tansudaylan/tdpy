@@ -10,6 +10,7 @@ from tdpy.verbosity import print
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgba
+from matplotlib.text import Text
 import numpy as np
 
 WASHU_RED = "#A51417"
@@ -70,6 +71,8 @@ def plot_style_parameters(typeplotback="white"):
         "legend.edgecolor": foreground,
         "legend.labelcolor": foreground,
         "legend.framealpha": 1.0,
+        "legend.frameon": True,
+        "legend.fancybox": True,
         "savefig.facecolor": background,
         "savefig.edgecolor": background,
         "savefig.transparent": False,
@@ -158,14 +161,21 @@ def save_plot(figure, *args, typeplotback=None, **kwargs):
     return figure.savefig(*args, **kwargs)
 
 
+def preserve_text_color(text):
+    """Keep an annotation's explicit contrast color when applying plot themes."""
+    text._tdpy_preserve_color = True
+    return text
+
+
 def apply_plot_theme(figure, typeplotback=None):
-    """Style an existing figure without changing data colors or global settings."""
+    """Theme axes and rounded, opaque legends without changing data colors."""
     typeplotback = _PLOT_BACKGROUND.get() if typeplotback is None else typeplotback
     background, foreground = plot_background_colors(typeplotback)
     figure.set_facecolor(background)
     figure.set_edgecolor(background)
     for text in figure.texts:
-        if to_rgba(text.get_color())[:3] in ((0.0, 0.0, 0.0), (1.0, 1.0, 1.0)):
+        if (not getattr(text, '_tdpy_preserve_color', False)
+            and to_rgba(text.get_color())[:3] in ((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))):
             text.set_color(foreground)
     legends = list(figure.legends)
     for axis in figure.axes:
@@ -173,7 +183,8 @@ def apply_plot_theme(figure, typeplotback=None):
         axis.grid(False)
         axis.tick_params(colors=foreground, which="both")
         for text in axis.texts:
-            if to_rgba(text.get_color())[:3] in ((0.0, 0.0, 0.0), (1.0, 1.0, 1.0)):
+            if (not getattr(text, '_tdpy_preserve_color', False)
+                    and to_rgba(text.get_color())[:3] in ((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))):
                 text.set_color(foreground)
         if hasattr(axis, "coords"):
             for coordinate in axis.coords:
@@ -195,6 +206,8 @@ def apply_plot_theme(figure, typeplotback=None):
         if axis.get_legend() is not None:
             legends.append(axis.get_legend())
     for legend in legends:
+        legend.set_frame_on(True)
+        legend.get_frame().set_boxstyle('round', pad=0.0, rounding_size=0.2)
         legend.get_frame().set_facecolor(background)
         legend.get_frame().set_edgecolor(foreground)
         legend.get_frame().set_alpha(1.0)
@@ -209,9 +222,23 @@ def save_figure(
     typefileplot="png",
     typeplotback=None,
     close_figure=False,
+    *,
+    font_size=None,
     **kwargs,
 ):
-    """Save a figure with a consistent background, axes, and output format."""
+    """Save a figure with a consistent background, axes, and output format.
+
+    ``font_size`` optionally makes all figure text use the document's point
+    size, including titles, annotations, tick labels and legend titles. Omit
+    it to retain caller-selected sizes. This does not rescale scientific data.
+    """
+    if font_size is not None:
+        size = np.asarray(font_size)
+        if (np.ma.is_masked(font_size) or size.ndim != 0 or size.dtype.kind not in 'iuf'
+                or not np.isfinite(size) or size <= 0.0):
+            raise ValueError('font_size must be an unmasked positive finite real scalar in points')
+        for text in figure.findobj(match=Text):
+            text.set_fontsize(float(size))
     typeplotback = _PLOT_BACKGROUND.get() if typeplotback is None else typeplotback
     path = plot_file_path(path, typefileplot)
     Path(path).parent.mkdir(parents=True, exist_ok=True)

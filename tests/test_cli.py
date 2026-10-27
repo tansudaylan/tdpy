@@ -1,7 +1,7 @@
 import pytest
 import tdpy
 
-from tdpy.cli import add_plot_arguments, dispatch_cli, parse_plot_arguments, run_plot_cli
+from tdpy.cli import add_plot_arguments, add_smoke_argument, dispatch_cli, parse_plot_arguments, run_plot_cli
 
 
 def test_parse_plot_arguments_defaults_to_png():
@@ -26,6 +26,38 @@ def test_add_plot_arguments_composes_with_existing_options():
 
     assert arguments.typefileplot == "pdf"
     assert arguments.quick is True
+
+
+def test_add_plot_arguments_accepts_custom_help():
+    import argparse
+
+    parser = add_plot_arguments(
+        argparse.ArgumentParser(), help="Output format (default: png)."
+    )
+
+    assert "Output format (default: png)." in parser.format_help()
+
+
+def test_add_plot_arguments_accepts_pdf_default():
+    import argparse
+
+    parser = add_plot_arguments(argparse.ArgumentParser(), default="pdf")
+
+    assert parser.parse_args([]).typefileplot == "pdf"
+
+
+def test_add_smoke_argument_composes_with_custom_options():
+    import argparse
+
+    parser = add_smoke_argument(
+        argparse.ArgumentParser(), help="Run a small pipeline check."
+    )
+    parser.add_argument("--steps", type=int, default=10)
+    arguments = parser.parse_args(["--smoke", "--steps", "3"])
+
+    assert arguments.smoke is True
+    assert arguments.steps == 3
+    assert "Run a small pipeline check." in parser.format_help()
 
 
 def test_run_plot_cli_forwards_output_format():

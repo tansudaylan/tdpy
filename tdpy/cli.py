@@ -20,13 +20,24 @@ def dispatch_cli(namespace, arguments=None, forward_arguments=True):
     return command(*(command_arguments if forward_arguments else []))
 
 
-def add_plot_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_plot_arguments(
+    parser: argparse.ArgumentParser, *, help: str | None = None, default: str = "png"
+) -> argparse.ArgumentParser:
     """Register the standard PNG-or-PDF option on an existing parser."""
     parser.add_argument(
         "--typefileplot",
         choices=("png", "pdf"),
-        default="png",
+        default=default,
+        help=help,
     )
+    return parser
+
+
+def add_smoke_argument(
+    parser: argparse.ArgumentParser, *, help: str | None = None
+) -> argparse.ArgumentParser:
+    """Register a shared boolean ``--smoke`` option on an existing parser."""
+    parser.add_argument("--smoke", action="store_true", help=help)
     return parser
 
 

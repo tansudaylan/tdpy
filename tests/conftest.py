@@ -1,4 +1,6 @@
-# tests check console narration, which pipelines otherwise suppress
-import os
+import pytest
 
-os.environ.setdefault('TDPY_VERBOSITY', '1')
+
+@pytest.fixture(autouse=True)
+def enable_test_narration(monkeypatch):
+    monkeypatch.setenv('TDPY_VERBOSITY', '1')

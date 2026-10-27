@@ -23,6 +23,93 @@ from tdpy.astro import (
 )
 
 
+@pytest.mark.parametrize('slope', [0.8, 1.2])
+@pytest.mark.parametrize('normalization', [None, True])
+def test_nfw_profile_matches_existing_discrete_density_sum(monkeypatch, slope, normalization):
+    import tdpy.util as util
+
+    longitude = np.array([1.0, 3.0, 7.0, 30.0, 90.0])  # [deg]
+    latitude = np.zeros_like(longitude)  # [deg]
+    monkeypatch.setattr(util, 'retr_healgrid',
+                        lambda side: (longitude, latitude, longitude.size, 4.0 * np.pi / longitude.size))
+    radius = np.logspace(-2.0, 2.0, 100)  # [kpc]
+    distance = np.linspace(0.0, 17.0, 100)  # [kpc]
+    density = (radius / 23.1)**(-slope) / (1.0 + radius / 23.1)**(3.0 - slope)
+    density *= 0.3 / np.interp(8.5, radius, density)  # [GeV/cm^3]
+    galactocentric_radius = np.sqrt(
+        8.5**2 + distance[:, None]**2
+        - 17.0 * distance[:, None] * np.cos(np.deg2rad(longitude))[None, :]
+    )  # [kpc]
+    expected = np.sum(np.interp(galactocentric_radius, radius, density)**2, axis=0)
+    if normalization is not None:
+        expected /= np.interp(5.0, longitude, expected)
+
+    with np.errstate(all='raise'):
+        result = util.retr_nfwp(slope, 1, norm=normalization)
+
+    np.testing.assert_allclose(result, expected, rtol=2e-13)
+    assert np.isfinite(result).all()
+    assert (result > 0.0).all()
+    np.testing.assert_array_equal(longitude, [1.0, 3.0, 7.0, 30.0, 90.0])
+    np.testing.assert_array_equal(latitude, np.zeros(5))
+
+
+@pytest.mark.parametrize('normalization', [None, True])
+def test_nfw_profile_runs_on_native_healpix_grid(normalization):
+    pytest.importorskip('healpy')
+    import tdpy.util as util
+
+    with np.errstate(all='raise'):
+        result = util.retr_nfwp(1.2, 16, norm=normalization)
+
+    assert result.shape == (3072,)
+    assert np.isfinite(result).all()
+    assert (result > 0.0).all()
+
+
+def test_ccd_precision_matches_astropy_and_independent_noise_budget():
+    from astropy.stats import signal_to_noise_oir_ccd
+    from tdpy.astro import ccd_photometric_precision
+
+    source = np.array([100.0, 1000.0])[None, :]
+    exposure = np.array([10.0, 100.0])[:, None]
+    original_source, original_exposure = source.copy(), exposure.copy()
+    result = ccd_photometric_precision(source, exposure, sky_rate_e_s_pixel=2.0,
+        dark_rate_e_s_pixel=0.5, read_noise_e=3.0, aperture_pixels=4.0, systematic_floor_ppm=20.0)
+    reference = np.hypot(1e6 / signal_to_noise_oir_ccd(exposure, source, 2.0, 0.5, 3.0, 4.0), 20.0)
+    independent = np.hypot(1e6 * np.sqrt(source * exposure + 4 * (2.5 * exposure + 9)) / (source * exposure), 20.0)
+    np.testing.assert_allclose(result, reference)
+    np.testing.assert_allclose(result, independent)
+    np.testing.assert_array_equal(source, original_source)
+    np.testing.assert_array_equal(exposure, original_exposure)
+    assert result.shape == (2, 2)
+
+
+def test_ccd_precision_has_poisson_exposure_scaling_and_supplied_floor():
+    from tdpy.astro import ccd_photometric_precision
+
+    assert ccd_photometric_precision(100.0, 100.0) == pytest.approx(10000.0)
+    assert ccd_photometric_precision(100.0, 400.0) == pytest.approx(5000.0)
+    assert ccd_photometric_precision(np.ma.array(100.0, mask=False), 100.0) == pytest.approx(10000.0)
+    assert ccd_photometric_precision(1e12, 1e6, systematic_floor_ppm=50.0) == pytest.approx(50.0)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("source_rate_e_s", 0), ("exposure_seconds", -1), ("aperture_pixels", 0),
+    ("sky_rate_e_s_pixel", -1), ("dark_rate_e_s_pixel", -1), ("read_noise_e", -1),
+    ("systematic_floor_ppm", -1), ("source_rate_e_s", np.inf),
+    ("source_rate_e_s", np.array([1 + 0j])), ("exposure_seconds", np.ma.array(1.0, mask=True)),
+    ("read_noise_e", "3"), ("aperture_pixels", True),
+])
+def test_ccd_precision_rejects_invalid_physical_inputs(field, value):
+    from tdpy.astro import ccd_photometric_precision
+
+    arguments = {"source_rate_e_s": 100.0, "exposure_seconds": 10.0}
+    arguments[field] = value
+    with pytest.raises(ValueError):
+        ccd_photometric_precision(**arguments)
+
+
 def test_target_visibility_samples_night_and_annual_darkness():
     result = analyze_target_visibility(
         right_ascension_degrees=186.574,  # [deg]

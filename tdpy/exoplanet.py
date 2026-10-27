@@ -1075,9 +1075,16 @@ def planetary_bulk_density(
 def stellar_bulk_density(
     mass_solar: float | np.ndarray,
     radius_solar: float | np.ndarray,
+    *,
+    solar_density_g_cm3: float = 1.408,
 ) -> float | np.ndarray:
-    """Calculate the stellar bulk mean density in g / cm^3 from Solar units."""
-    dens = 1.408 * np.asarray(mass_solar, dtype=float) / (np.asarray(radius_solar, dtype=float) ** 3)
+    """Return mean stellar density in g / cm^3 for mass and radius in solar units.
+
+    ``solar_density_g_cm3`` sets the result for a one-solar-mass,
+    one-solar-radius star. It defaults to 1.408. Array inputs follow NumPy
+    broadcasting, and scalar inputs return a float.
+    """
+    dens = solar_density_g_cm3 * np.asarray(mass_solar, dtype=float) / (np.asarray(radius_solar, dtype=float) ** 3)
     if np.ndim(mass_solar) == 0 and np.ndim(radius_solar) == 0:
         return float(dens)
     return dens

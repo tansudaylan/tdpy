@@ -65,11 +65,28 @@ export TDPY_PATH=/path/to/tdpy
 
 Install `python -m pip install -e '.[bokeh]'` to enable `tdpy.plotting.save_bokeh_html` and the maintained examples' interactive HTML outputs.
 
+Install `python -m pip install -e '.[healpix]'` for the Healpy-backed `retr_healgrid`, `retr_nfwp`, `retr_mapspnts`, and `smth_heal` helpers. The halo helper returns unweighted density-squared sums. Converting these to physical annihilation J-factors requires distance weights and unit conversion.
+
+`retr_psfngausnorm` normalizes a circular Gaussian over solid angle and takes its width in radians. `retr_mapspnts` takes sky coordinates and a common Gaussian width in degrees and estimates each pixel's flux from the Gaussian value at its center.
+
+`smth_heal` applies the harmonic filter `exp(-0.5 * (ell / bandwidth)**2)`. With `mpol=True`, `scalsmth` is the bandwidth directly. Otherwise, the bandwidth is `180 / scalsmth`, with `scalsmth` in degrees. Its full return retains coefficients at the input harmonic limit even when the output map resolution changes.
+
+Package metadata is defined in `pyproject.toml`, including the Python minimum,
+dependencies, and repository URLs. The package-metadata test builds a wheel
+from a scratch copy, installs it into a temporary target, and checks its
+metadata and public numerical imports without using the working-tree package.
+This check does not publish a release or replace a supported-version test matrix.
+
 `TDPY_PATH` identifies the repository root. Runtime inputs belong under `data/` and generated pipeline outputs belong under `visuals/`. Both directories are ignored by Git. Other repositories follow the same `<REPOSITORY>_PATH` root convention.
+
+Use `import tdpy` after installation. Repository-root compatibility imports
+resolve to the same canonical package and plotting context. Importing TDpy
+does not recreate NumPy's removed `np.trapz` alias. Maintained integration code
+can use `scipy.integrate.trapezoid` without relying on that import side effect.
 
 ## Console output
 
-TDpy and pipelines built on it, including PCAT, Miletos, and Ephesos, print nothing by default, including progress bars and numerical warnings. Set `export TDPY_VERBOSITY=1` to enable progress messages, file narration, and warnings.
+TDpy's console printing and progress bars are quiet by default. Set `export TDPY_VERBOSITY=1` before importing TDpy to enable progress messages and file narration without installing its quiet-mode warning filters. Those filters cover the pipeline modules named in [the verbosity module](tdpy/verbosity.py) and deprecation notices. Other warnings and third-party direct output may still appear. Exceptions are not suppressed.
 
 ## Quick example
 
@@ -81,7 +98,7 @@ python examples/catalog_overlay_diagnostic.py --typefileplot png
 
 ![Synthetic catalog overlay](examples/catalog_overlay_diagnostic.png)
 
-This produces a two-panel figure showing a deterministic Gaussian source field before and after catalog annotation. The three sources have mean magnitudes of 11, 12, and 13 mag. Two are isolated and one is labeled as blended. These are clearly labeled simulated inputs rather than observational evidence.
+The 40-by-40 pixel field is fully synthetic. It contains three Gaussian sources with mean magnitudes of 11, 12, and 13 mag. The first two are labeled as isolated, and the third as blended.
 
 ## Catalog annotation
 
@@ -92,6 +109,13 @@ Compare the plain image with the annotated view to inspect the supplied position
 `tdpy.plot_catl()` overlays source positions, magnitudes, and annotations on image fields. PCAT draws corner plots of parameter samples and provides posterior sampling, including `pcat.fixed.sample_posterior`.
 
 These routines can be called directly wherever an analysis needs consistent catalog annotations.
+
+Pass `font_size=11.0` to `tdpy.save_figure` when the document's main text is
+11 points. The saver applies that point size to titles, labels, annotations,
+ticks, and legend text without changing plotted data or global settings.
+Omit the option to retain caller-selected sizes. Set the figure's physical
+width for its final placement, since resizing it in a document also rescales
+the text. The helper does not infer a document's font or embedding width.
 
 ## Posterior sampling
 

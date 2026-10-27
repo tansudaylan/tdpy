@@ -11,6 +11,129 @@ from tdpy.spectral import (
 )
 
 
+@pytest.mark.parametrize('model', ['constant', 'linear', 'piecewise'])
+@pytest.mark.parametrize('edges', [[1.0, 2.0, 10.0], [1.0, 3.0, 7.0, 10.0]])
+@pytest.mark.parametrize('verbosity', ['0', '1'])
+def test_isotropic_background_averages_requested_energy_bins(tmp_path, monkeypatch, capsys, model, edges, verbosity):
+    from scipy.integrate import quad
+    import tdpy
+
+    energy = np.array([1.0, 2.0, 4.0, 6.0, 10.0])  # [GeV]
+    spectra = {
+        'constant': np.full(5, 0.003),
+        'linear': (1.0 + 0.2 * energy) * 0.001,
+        'piecewise': np.array([2.0, 5.0, 1.0, 7.0, 3.0]) * 0.001,
+    }  # [1/cm^2/s/sr/GeV]
+    brightness = spectra[model]  # [1/cm^2/s/sr/GeV]
+    directory = tmp_path / 'data'
+    directory.mkdir()
+    path = directory / 'iso_P8R2_SOURCE_V6_v06.txt'
+    np.savetxt(path, np.column_stack((energy * 1000.0, brightness / 1000.0)))
+    original_bytes = path.read_bytes()
+    bins = np.array(edges)  # [GeV]
+    original_bins = bins.copy()
+    expected = np.array([
+        quad(lambda value: np.interp(value, energy, brightness), lower, upper,
+             points=energy[(energy > lower) & (energy < upper)])[0] / (upper - lower)
+        for lower, upper in zip(bins[:-1], bins[1:])
+    ])
+    monkeypatch.setenv('TDPY_PATH', str(tmp_path))
+    monkeypatch.setenv('TDPY_VERBOSITY', verbosity)
+    capsys.readouterr()
+
+    with np.errstate(all='raise'):
+        result = tdpy.retr_isot(bins, numbside=2)
+
+    assert result.shape == (bins.size - 1, 48)
+    np.testing.assert_allclose(result, np.broadcast_to(expected[:, None], result.shape), rtol=2e-14)
+    np.testing.assert_array_equal(bins, original_bins)
+    assert path.read_bytes() == original_bytes
+    assert capsys.readouterr().out == (f'Reading from {path}...\n' if verbosity == '1' else '')
+
+
+@pytest.mark.parametrize('channel,column', [('e', 4), ('mu', 7), ('tau', 10), ('b', 13)])
+@pytest.mark.parametrize('particle,filename', [('el', 'AtProduction_positrons'), ('ph', 'AtProduction_gammas')])
+@pytest.mark.parametrize('verbosity', ['0', '1'])
+def test_dark_matter_table_loader_preserves_channel_grid_and_narration(
+    tmp_path, monkeypatch, capsys, channel, column, particle, filename, verbosity
+):
+    import tdpy
+
+    directory = tmp_path / 'data' / 'p4dm'
+    directory.mkdir(parents=True)
+    path = directory / f'{filename}.dat'
+    masses = np.repeat([2.0, 1.0], 3)  # [GeV]
+    energy_fractions = np.array([0.01, 0.1, 1.0])
+    table = np.zeros((6, 14))
+    table[:, 0] = masses
+    table[:, 1] = np.tile(np.log10(energy_fractions), 2)
+    for channel_column in (4, 7, 10, 13):
+        table[:, channel_column] = channel_column + 10.0 * masses + np.tile(np.arange(3), 2)
+    np.savetxt(path, table)
+    original_bytes = path.read_bytes()
+    monkeypatch.setenv('TDPY_PATH', str(tmp_path))
+    monkeypatch.setenv('TDPY_VERBOSITY', verbosity)
+    capsys.readouterr()
+
+    spectra, fractions, mass_grid = tdpy.retr_p4dm_spec(channel, part=particle)
+
+    expected = column + 10.0 * np.array([1.0, 2.0])[None, :] + np.arange(3)[:, None]
+    np.testing.assert_array_equal(spectra, expected)
+    np.testing.assert_allclose(fractions, energy_fractions)
+    np.testing.assert_array_equal(mass_grid, [1000.0, 2000.0])
+    assert spectra.shape == (3, 2)
+    assert path.read_bytes() == original_bytes
+    assert capsys.readouterr().out == (f'Reading from {path}...\n' if verbosity == '1' else '')
+
+
+@pytest.mark.parametrize('second_grid', [[-2.0, -0.5], [-1.0, -2.0], [-2.0, -1.0, 0.0]])
+def test_dark_matter_table_loader_rejects_misaligned_mass_grids(tmp_path, monkeypatch, second_grid):
+    import tdpy
+
+    directory = tmp_path / 'data' / 'p4dm'
+    directory.mkdir(parents=True)
+    path = directory / 'AtProduction_positrons.dat'
+    table = np.zeros((2 + len(second_grid), 14))
+    table[:2, 0] = 1.0  # [GeV]
+    table[2:, 0] = 2.0  # [GeV]
+    table[:2, 1] = [-2.0, -1.0]
+    table[2:, 1] = second_grid
+    table[:, 4] = np.arange(table.shape[0]) + 1.0
+    np.savetxt(path, table)
+    original_bytes = path.read_bytes()
+    monkeypatch.setenv('TDPY_PATH', str(tmp_path))
+
+    with pytest.raises(ValueError, match='energy grid'):
+        tdpy.retr_p4dm_spec('e')
+
+    assert path.read_bytes() == original_bytes
+
+
+@pytest.mark.parametrize('field', ['anch', 'part'])
+def test_dark_matter_table_loader_rejects_unknown_options_before_reading(tmp_path, monkeypatch, capsys, field):
+    import tdpy
+
+    directory = tmp_path / 'data' / 'p4dm'
+    directory.mkdir(parents=True)
+    path = directory / 'AtProduction_positrons.dat'
+    table = np.zeros((2, 14))
+    table[:, 0] = [1.0, 2.0]  # [GeV]
+    table[:, 1] = -1.0
+    np.savetxt(path, table)
+    original_bytes = path.read_bytes()
+    arguments = {'anch': 'e', 'part': 'el'}
+    arguments[field] = 'unknown'
+    monkeypatch.setenv('TDPY_PATH', str(tmp_path))
+    monkeypatch.setenv('TDPY_VERBOSITY', '1')
+    capsys.readouterr()
+
+    with pytest.raises(ValueError, match='channel|particle'):
+        tdpy.retr_p4dm_spec(**arguments)
+
+    assert capsys.readouterr().out == ''
+    assert path.read_bytes() == original_bytes
+
+
 @pytest.mark.parametrize(
     ("profile", "parameters", "tolerance"),
     (

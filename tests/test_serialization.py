@@ -45,6 +45,40 @@ def test_fits_writer_preserves_data_header_narration_and_overwrite(tmp_path, cap
     np.testing.assert_array_equal(fits.getdata(path), data + 1.0)
 
 
+@pytest.mark.parametrize('verbosity', ['0', '1'])
+@pytest.mark.parametrize('extension', [0, 1, 'SCI'])
+def test_native_fits_helpers_preserve_extensions_headers_and_file_bytes(
+    tmp_path, monkeypatch, capsys, verbosity, extension
+):
+    from astropy.io import fits
+    from tdpy import util
+
+    primary = np.arange(6, dtype=np.int16).reshape(2, 3)
+    science = np.arange(12, dtype=np.float64).reshape(3, 4) + 10.0
+    header = fits.Header({'BUNIT': 'count', 'OBJECT': 'synthetic fixture'})
+    path = tmp_path / 'extensions.fits'
+    fits.HDUList([
+        fits.PrimaryHDU(primary, header=header),
+        fits.ImageHDU(science, header=header, name='SCI'),
+    ]).writeto(path)
+    original_bytes = path.read_bytes()
+    monkeypatch.setenv('TDPY_VERBOSITY', verbosity)
+    capsys.readouterr()
+
+    values, restored_header = util._read_fits_data(path, extension, header=True, memmap=False)
+    expected = primary if extension == 0 else science
+    np.testing.assert_array_equal(values, expected)
+    assert restored_header['BUNIT'] == 'count'
+    assert restored_header['OBJECT'] == 'synthetic fixture'
+    with util._open_fits(path) as opened:
+        np.testing.assert_array_equal(opened[extension].data, expected)
+        assert opened[extension].header['BUNIT'] == 'count'
+
+    assert opened._file.closed
+    assert path.read_bytes() == original_bytes
+    assert capsys.readouterr().out == (2 * f'Reading from {path}...\n' if verbosity == '1' else '')
+
+
 def test_planck_fits_read_helpers_narrate_and_preserve_results(
     monkeypatch, capsys
 ):
